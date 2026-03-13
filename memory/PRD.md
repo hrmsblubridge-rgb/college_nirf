@@ -11,29 +11,28 @@ Create a premium redesigned version of the BluBridge Registration Form as a new 
 
 ## What's Been Implemented (Feb 2026)
 
+## What's Been Implemented (Feb 2026)
+
 ### /register-premium page (RegisterPremium.jsx)
 - Premium card with rounded-3xl corners, large box-shadow
 - Blue gradient accent bar at top of card
 - Manrope font for the Registration Form heading
-- Sticky header with frosted glass effect (backdrop-blur), BluBridge logo with blue "B" box, Logout button
-- All original fields preserved:
-  - Full Name (with User icon)
-  - Email Address (with Mail icon)
-  - Phone Number (with Phone icon + WhatsApp note)
-  - Age (with Hash icon)
-  - Current Location/State (shadcn Select dropdown)
-  - Preferred Location/City (text input with MapPin icon)
-  - Year of Graduation (shadcn Select dropdown)
-  - College (text input with Building2 icon)
-  - Degree (shadcn Select dropdown)
-  - Course (shadcn Select dropdown)
-- Section dividers: Personal Information / Location Details / Academic Information
-- Uppercase tracked small labels (same naming as original)
-- Confirmation checkbox with blue highlight when checked
-- PROCEED button: blue when checkbox checked, grayed when unchecked, hover lift effect
-- Dark footer (#222222) with copyright
-- Full mobile responsiveness (1-col on mobile, 2-col on desktop)
-- data-testid on all interactive elements
+- Sticky header with frosted glass effect, BluBridge logo, Logout button
+- All original fields: Full Name, Email, Phone (+WhatsApp note), Age, State dropdown, City, Grad Year, College, Degree, Course
+- Section dividers, confirmation checkbox, PROCEED button
+- Dark footer, mobile responsive, data-testid on all elements
+
+### College Rankings Excel (BluBridge_College_Rankings_NIRF_2025.xlsx)
+- Source: NIRF 2025 Engineering Rankings
+- Total colleges: 301 (100 ranked + 201 null-rank)
+- Columns: Rank | College Name | City | State
+- Top 100: specific NIRF ranks 1-100
+- Band 101-150: 50 colleges (null rank)
+- Band 151-200: 52 colleges (null rank)
+- Band 201-300: 99 colleges (null rank)
+- Color-coded Excel: Blue header, ranked rows in light blue, null rows in light gray
+- Band separator rows for easy navigation
+- Download endpoint: GET /api/download-college-list
 
 ## Colors (Same as Original)
 - Background: #F5F2E9 (beige/cream)

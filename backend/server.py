@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -65,6 +66,17 @@ async def get_status_checks():
             check['timestamp'] = datetime.fromisoformat(check['timestamp'])
     
     return status_checks
+
+@api_router.get("/download-college-list")
+async def download_college_list():
+    file_path = Path("/app/college_rankings.xlsx")
+    if not file_path.exists():
+        return {"error": "File not found"}
+    return FileResponse(
+        path=str(file_path),
+        filename="BluBridge_College_Rankings_NIRF_2025.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # Include the router in the main app
 app.include_router(api_router)
