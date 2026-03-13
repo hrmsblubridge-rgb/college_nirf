@@ -1,0 +1,135 @@
+{
+  "project_name": "BluBridge Registration Premium",
+  "theme": "light",
+  "design_philosophy": {
+    "identity": "E1 - Anti-AI Designer",
+    "core_principles": [
+      "Fusion over Imitation: Mix academic rigor with modern SaaS clean aesthetics.",
+      "Emotion First: Trust, Clarity, Professionalism.",
+      "Content is King: The form is the hero. Minimize distraction.",
+      "Zoom In: Focus on the input field interaction.",
+      "Negative Space: Generous padding (p-8 to p-12) to create a premium feel."
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Manrope, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight leading-tight",
+      "h2": "text-3xl font-semibold tracking-tight",
+      "h3": "text-xl font-medium tracking-normal",
+      "body": "text-base leading-relaxed text-gray-600",
+      "label": "text-sm font-medium text-gray-700 uppercase tracking-wide",
+      "small": "text-xs text-gray-500"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#F5F2E9",
+      "foreground": "#111827",
+      "card": "#FFFFFF",
+      "card_foreground": "#111827",
+      "primary": "#1A73E8",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#F3F4F6",
+      "secondary_foreground": "#1F2937",
+      "muted": "#9CA3AF",
+      "muted_foreground": "#6B7280",
+      "accent": "#E0E7FF",
+      "accent_foreground": "#1A73E8",
+      "destructive": "#EF4444",
+      "destructive_foreground": "#FFFFFF",
+      "border": "#E5E7EB",
+      "input": "#F9FAFB",
+      "ring": "#1A73E8"
+    },
+    "specifics": {
+      "footer_bg": "#222222",
+      "footer_text": "#FFFFFF",
+      "form_label": "#374151"
+    }
+  },
+  "layout": {
+    "grid_system": "2-column grid (grid-cols-1 md:grid-cols-2 gap-6)",
+    "container": "max-w-3xl mx-auto",
+    "spacing": {
+      "page_padding": "px-4 py-12 md:py-20",
+      "card_padding": "p-8 md:p-12",
+      "element_gap": "gap-6"
+    },
+    "structure": {
+      "header": "Sticky or fixed top, z-50, glassmorphic or solid beige",
+      "main": "min-h-screen flex items-center justify-center bg-[#F5F2E9]",
+      "footer": "w-full py-8 bg-[#222222] text-white"
+    }
+  },
+  "components": {
+    "Card": {
+      "name": "RegistrationCard",
+      "style": "bg-white rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border border-gray-100/50 overflow-hidden relative",
+      "usage": "Wraps the entire form content"
+    },
+    "Input": {
+      "name": "PremiumInput",
+      "style": "h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg transition-all duration-200 text-base placeholder:text-gray-400",
+      "label_style": "block mb-2 text-sm font-semibold text-gray-700 tracking-wide"
+    },
+    "Select": {
+      "name": "PremiumSelect",
+      "style": "h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg transition-all duration-200 text-base"
+    },
+    "Button": {
+      "name": "ProceedButton",
+      "style": "h-14 w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-bold text-lg rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0",
+      "icon": "ArrowRight (Lucide)"
+    },
+    "Checkbox": {
+      "name": "ConfirmationCheckbox",
+      "style": "h-5 w-5 border-2 border-gray-300 rounded text-blue-600 focus:ring-blue-500 transition-colors"
+    },
+    "Header": {
+        "style": "fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 md:px-12 bg-[#F5F2E9]/80 backdrop-blur-md z-40 border-b border-gray-200/50",
+        "logo_style": "text-2xl font-extrabold text-[#1A73E8] tracking-tighter font-manrope",
+        "link_style": "text-sm font-medium text-gray-600 hover:text-[#1A73E8] transition-colors"
+    },
+    "Footer": {
+        "style": "bg-[#222222] text-white py-12 mt-auto"
+    }
+  },
+  "assets": {
+    "images": [],
+    "icons": "Lucide React (already installed)",
+    "fonts": "Import Manrope and Inter from Google Fonts"
+  },
+  "interactions": {
+    "hover": "Subtle lift (-1px) and shadow increase for cards/buttons",
+    "focus": "Ring-2 ring-blue-500/20 border-blue-500",
+    "loading": "Skeleton loaders for initial load, spinner on button click",
+    "validation": "Real-time inline validation with red-500 text and shake animation"
+  },
+  "accessibility": {
+    "contrast": "Ensure 4.5:1 for normal text",
+    "keyboard_nav": "Full tab support",
+    "labels": "All inputs must have visible labels or aria-labels"
+  },
+  "instructions_to_main_agent": [
+    "Use 'use-toast.js' (located in /app/frontend/src/hooks/use-toast.js) or 'sonner' (if available) for notifications.",
+    "The page route is /register-premium.",
+    "Implement the form using react-hook-form and zod for validation.",
+    "Ensure the 'Active WhatsApp number Required' note is visible under the Phone field.",
+    "Use a 2-column grid layout for the form fields on desktop, single column on mobile.",
+    "Header must contain 'BluBridge' text logo on left and 'Logout' link on right.",
+    "Footer must be dark (#222222).",
+    "Do NOT use gradients for the background. Keep it solid #F5F2E9 as requested.",
+    "Add 'data-testid' to all inputs and buttons."
+  ],
+  "universal_guidelines": [
+    "Do not use generic 'Inter' for headings. Use 'Manrope'.",
+    "Avoid 'Center-Everything' disease. Align labels left.",
+    "Use 'sonner' for toasts.",
+    "Component reuse: Check /app/frontend/src/components/ui/ before creating new ones."
+  ]
+}
