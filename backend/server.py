@@ -150,9 +150,10 @@ async def process_excel(file: UploadFile = File(...)):
         return None
 
     ug_col  = find_col(["ug university", "ug uni"])
-    ug_rank_col = find_col(["rank ug", "ug rank"])
+    # Rank column is always the column immediately after the university name column
+    ug_rank_col = (ug_col + 1) if ug_col else find_col(["rank ug", "ug rank"])
     pg_col  = find_col(["pg university", "pg uni"])
-    pg_rank_col = find_col(["rank pg", "pg rank"])
+    pg_rank_col = (pg_col + 1) if pg_col else find_col(["rank pg", "pg rank"])
 
     # ── Build output workbook ──────────────────────────────────────────────
     wb_out = openpyxl.Workbook()
@@ -177,8 +178,9 @@ async def process_excel(file: UploadFile = File(...)):
         cell.border = excel_thin_border()
     ws1.row_dimensions[1].height = 28
 
-    # Track matched colleges for Tab 2
-    matched_pairs = {}  # {college_name: {"rank": ..., "short_names": [...]}}
+    # Track original input names + matched rank for Tab 2
+    # List of (original_input_name, rank_string) — one per applicant row
+    ug_tab2_rows = []   # [(original_ug_name, rank_str), ...]
 
     # Copy rows + fill ranks
     for row_idx in range(2, ws_in.max_row + 1):
@@ -200,16 +202,17 @@ async def process_excel(file: UploadFile = File(...)):
         if ug_col:
             ug_name = ws_in.cell(row=row_idx, column=ug_col).value
             if ug_name and str(ug_name).strip():
-                matched = match_college(str(ug_name), colleges)
+                original_name = str(ug_name).strip()
+                matched = match_college(original_name, colleges)
                 rank_val = rank_display(matched)
+                # Always add to Tab2, even if rank is empty
+                ug_tab2_rows.append((original_name, rank_val))
                 if rank_val:
                     r_cell = ws1.cell(row=row_idx, column=ug_rank_col) if ug_rank_col else None
                     if r_cell:
                         r_cell.value = rank_val
                         r_cell.font = null_font if rank_val == "null" else rank_font
                         r_cell.alignment = Alignment(horizontal="center", vertical="center")
-                    if matched:
-                        matched_pairs[matched["college_name"]] = matched
 
         # Fill PG rank
         if pg_col:
@@ -223,8 +226,6 @@ async def process_excel(file: UploadFile = File(...)):
                         r_cell.value = rank_val
                         r_cell.font = null_font if rank_val == "null" else rank_font
                         r_cell.alignment = Alignment(horizontal="center", vertical="center")
-                    if matched:
-                        matched_pairs[matched["college_name"]] = matched
 
     # Auto-width for first few key columns
     for col in ws1.columns:
@@ -236,72 +237,46 @@ async def process_excel(file: UploadFile = File(...)):
     # ─ Sheet 2: Ranking Reference ──────────────────────────────────────────
     ws2 = wb_out.create_sheet("Ranking Reference")
 
-    # Title
-    ws2.merge_cells("A1:B1")
-    t = ws2["A1"]
-    t.value = "College Ranking Reference — Matched from Job Post Excel"
-    t.font = Font(name="Calibri", bold=True, size=13, color="FFFFFF")
-    t.fill = PatternFill("solid", fgColor="0F4C81")
-    t.alignment = Alignment(horizontal="center", vertical="center")
-    ws2.row_dimensions[1].height = 32
+    # Column widths
+    ws2.column_dimensions["A"].width = 55
+    ws2.column_dimensions["B"].width = 14
 
-    # Headers
-    for c, h in enumerate(["UG University/institute Name", "Rank"], 1):
-        cell = ws2.cell(row=2, column=c, value=h)
-        cell.font = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
-        cell.fill = PatternFill("solid", fgColor="1A73E8")
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+    # Header row — matches screenshot exactly: white bg, bold text, centered
+    hdr_cells = [("UG University/institute Name", 1), ("Rank", 2)]
+    for label, c in hdr_cells:
+        cell = ws2.cell(row=1, column=c, value=label)
+        cell.font = Font(name="Calibri", bold=True, size=11, color="111827")
+        cell.fill = PatternFill("solid", fgColor="FFFFFF")
         cell.border = excel_thin_border()
-    ws2.row_dimensions[2].height = 24
-    ws2.column_dimensions["A"].width = 65
-    ws2.column_dimensions["B"].width = 12
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws2.row_dimensions[1].height = 36
 
-    # Data rows: full name + short name(s) per college
-    row_num = 3
-    green_fill  = PatternFill("solid", fgColor="E8F5E9")
-    green_fill2 = PatternFill("solid", fgColor="F1FAF1")
+    # Data rows — exact input names in order, alternating light green fill
+    green_fill  = PatternFill("solid", fgColor="E8F5E9")   # light green
+    white_fill  = PatternFill("solid", fgColor="FFFFFF")
 
-    sorted_colleges = sorted(matched_pairs.values(),
-                              key=lambda x: (x["rank"] is None, x["rank"] or 9999))
+    for i, (orig_name, rank_str) in enumerate(ug_tab2_rows):
+        row_num = i + 2
+        row_fill = green_fill  # all rows get the light green (matches screenshot)
 
-    for i, college in enumerate(sorted_colleges):
-        grp_fill = green_fill if i % 2 == 0 else green_fill2
-        rank_str = str(college["rank"]) if college.get("rank") is not None else "null"
-
-        # Full name row
-        cell_name = ws2.cell(row=row_num, column=1, value=college["college_name"])
-        cell_name.font = Font(name="Calibri", bold=True, size=10, color="111827")
-        cell_name.fill = grp_fill
+        # Name cell
+        cell_name = ws2.cell(row=row_num, column=1, value=orig_name)
+        cell_name.font = Font(name="Calibri", size=11, color="111827")
+        cell_name.fill = row_fill
         cell_name.border = excel_thin_border()
         cell_name.alignment = Alignment(horizontal="center", vertical="center")
 
-        cell_rank = ws2.cell(row=row_num, column=2, value=rank_str)
-        cell_rank.font = Font(name="Calibri", bold=True, size=10,
-                              color="1A73E8" if rank_str != "null" else "9CA3AF")
-        cell_rank.fill = grp_fill
+        # Rank cell
+        rank_val_display = rank_str if rank_str else ""
+        cell_rank = ws2.cell(row=row_num, column=2, value=rank_val_display)
+        cell_rank.font = Font(name="Calibri", size=11, color="111827")
+        cell_rank.fill = row_fill
         cell_rank.border = excel_thin_border()
         cell_rank.alignment = Alignment(horizontal="center", vertical="center")
-        ws2.row_dimensions[row_num].height = 18
-        row_num += 1
 
-        # Short name rows (one per short name)
-        for sname in college.get("short_names", []):
-            cell_sn = ws2.cell(row=row_num, column=1, value=sname)
-            cell_sn.font = Font(name="Calibri", italic=True, size=10, color="374151")
-            cell_sn.fill = grp_fill
-            cell_sn.border = excel_thin_border()
-            cell_sn.alignment = Alignment(horizontal="center", vertical="center")
+        ws2.row_dimensions[row_num].height = 28
 
-            cell_sr = ws2.cell(row=row_num, column=2, value=rank_str)
-            cell_sr.font = Font(name="Calibri", size=10,
-                                color="1A73E8" if rank_str != "null" else "9CA3AF")
-            cell_sr.fill = grp_fill
-            cell_sr.border = excel_thin_border()
-            cell_sr.alignment = Alignment(horizontal="center", vertical="center")
-            ws2.row_dimensions[row_num].height = 18
-            row_num += 1
-
-    ws2.freeze_panes = "A3"
+    ws2.freeze_panes = "A2"
 
     # ── Stream back as download ──────────────────────────────────────────────
     out_buffer = io.BytesIO()

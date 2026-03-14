@@ -1,66 +1,74 @@
-# BluBridge Registration Form - Premium Design
+# PRD - BluBridge College Ranking Processor
 
 ## Problem Statement
-Create a premium redesigned version of the BluBridge Registration Form as a new page at `/register-premium`. Same fields, same labels, same color palette — just upgraded to a premium design.
+BluBridge platform needs:
+1. Premium Registration Form page (/register-premium)
+2. Home page (/) with College Ranking Excel Processor
+3. 300 NIRF 2025 colleges saved in MongoDB
+4. Upload Job Post Excel → auto-fill UG/PG ranks → download 2-tab processed Excel
+5. Download NIRF reference Excel files
 
 ## Architecture
-- Frontend: React + Tailwind CSS + shadcn UI components
-- Backend: FastAPI (not modified for this task)
-- Database: MongoDB (not modified for this task)
-- Fonts: Manrope (headings) + Inter (body) via Google Fonts
+- Frontend: React + Tailwind CSS + shadcn UI
+- Backend: FastAPI
+- Database: MongoDB
+- Fonts: Manrope + Inter (Google Fonts)
 
-## What's Been Implemented (Feb 2026)
+## What's Been Implemented
 
-## What's Been Implemented (Feb 2026)
+### /register-premium (RegisterPremium.jsx)
+- Premium card with blue gradient accent bar, Manrope heading font
+- Frosted-glass sticky header with BluBridge logo
+- All original fields: Full Name, Email, Phone (+WhatsApp note), Age, State dropdown, City, Grad Year, College, Degree, Course
+- Section dividers, confirmation checkbox, PROCEED button (activates only when checked)
+- Dark footer, mobile responsive, all data-testids
 
-## What's Been Implemented (Mar 2026)
-
-### Home Page (`/`) — BluBridgeHome.jsx
-- Premium BluBridge-branded homepage with beige background, white cards, blue accents
-- **Stats section**: Total Colleges (dynamic from API), NIRF Ranked, Rank Band
-- **Upload Card**: Drag-and-drop or browse to upload Job Post Excel (.xlsx/.xls)
-  - 3-step visual guide (Upload → Auto Match → Download)
-  - Processing state with spinner
-  - Success/error messages with download link
-- **Download Card**: 3 download options
-  - Processed Excel (appears after processing)
-  - NIRF Rankings with Short Names
-  - NIRF Rankings (Original)
-- **Seed DB Card**: One-click seed/refresh 300 colleges to MongoDB
+### Home Page / (BluBridgeHome.jsx)
+- Premium BluBridge-branded homepage (beige bg, white cards, blue accents)
+- Live stats (Total Colleges / NIRF Ranked / Rank Band) from /api/colleges/stats
+- Upload Card: drag-and-drop Job Post Excel with 3-step visual guide
+- Download Card: 3 download options (Processed Excel + 2 NIRF reference files)
+- Seed DB button: one-click seed 300 colleges to MongoDB
 
 ### Backend APIs
-- `POST /api/colleges/seed` - Seeds all 300 colleges into MongoDB
-- `GET /api/colleges` - Paginated college list
-- `GET /api/colleges/stats` - Returns total, ranked, unranked counts
-- `POST /api/process-excel` - Upload Job Post Excel → returns processed Excel:
-  - Tab 1: All original data with Rank UG + Rank PG auto-filled
-  - Tab 2: Ranking Reference (full name + short names + rank pairs)
-  - Matching: exact → short name → fuzzy (threshold 0.82)
-  - Unranked band colleges → "null"
+- POST /api/colleges/seed — Seeds all 300 colleges into MongoDB
+- GET /api/colleges — Paginated college list
+- GET /api/colleges/stats — Returns total/ranked/unranked counts
+- POST /api/process-excel — Main feature:
+  - Accepts Job Post Excel upload (.xlsx/.xls)
+  - Finds UG University/institute Name column (col 22), Rank column (col 23)
+  - Finds PG university/institute name column (col 27), Rank column (col 28)
+  - Matches each college name via: exact → short name → fuzzy (threshold 0.82)
+  - Top-100 colleges → specific rank (1–100)
+  - Band colleges (101–300) → "null"
+  - Unrecognized colleges → blank
+  - Returns 2-tab Excel:
+    * Tab 1: All original applicant data with Rank UG + Rank PG filled in
+    * Tab 2 "Ranking Reference": Exact original input names (as typed by applicants) + matched rank, same order as input
+- GET /api/download-college-list — Original rankings Excel
+- GET /api/download-college-list-shortnames — Rankings with short names Excel
 
-### College Database (MongoDB)
-- 300 colleges: rank, college_name, short_names[], city, state
-- 100 with specific NIRF ranks (1-100)
-- 200 in rank bands (rank = null)
+### MongoDB College Data (300 colleges)
+- Fields: rank (int or null), college_name, short_names[], city, state
+- 100 with NIRF ranks 1–100
+- 200 in rank bands 101–150, 151–200, 201–300 (rank = null)
+- Source: NIRF 2025 Engineering Rankings
 
-### Excel Files
-- `/api/download-college-list` → Original rankings (Rank | Name | City | State)
-- `/api/download-college-list-shortnames` → With short names (Rank | Name | Short Name | City | State)
+## Excel Files Available
+- /app/college_rankings.xlsx — Rank | Name | City | State
+- /app/college_rankings_with_shortnames.xlsx — Rank | Name | Short Name | City | State
 
-## Colors (Same as Original)
-- Background: #F5F2E9 (beige/cream)
-- Card: #FFFFFF
-- Primary CTA: #1A73E8 (blue)
-- Footer: #222222
-- Labels: #374151 (gray-700)
+## Tab 2 Format (Ranking Reference) — Exact screenshot match
+| UG University/institute Name | Rank |
+|------------------------------|------|
+| Vellore Institute of Technology | 16 |
+| VIT | 16 |
+| Jadavpur University | 18 |
+| JU | 18 |
 
-## Routes
-- `/` - Original home page
-- `/register-premium` - New premium registration form page
-
-## Backlog / Next Action Items
-- P1: Add form submission with backend API
-- P1: Add form validation (required fields, email format, phone format)
-- P2: Add success confirmation screen/modal after PROCEED
-- P2: Toast notification on submission
-- P2: Add smooth page entrance animations
+## Next Action Items (Backlog)
+- P1: College dropdown in Registration Form → search from 300 DB colleges
+- P1: Form submission with backend API + save to DB
+- P2: Form validation (required fields, email/phone format)
+- P2: Success confirmation screen/modal after PROCEED
+- P2: Auth/login system
