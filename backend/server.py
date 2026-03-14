@@ -150,15 +150,26 @@ async def process_excel(file: UploadFile = File(...)):
         return None
 
     ug_col  = find_col(["ug university", "ug uni"])
-    # Rank column is always the column immediately after the university name column
-    ug_rank_col = (ug_col + 1) if ug_col else find_col(["rank ug", "ug rank"])
     pg_col  = find_col(["pg university", "pg uni"])
-    pg_rank_col = (pg_col + 1) if pg_col else find_col(["rank pg", "pg rank"])
+
+    # Detect if a "Rank" column already exists right after UG university col
+    # If col ug_col+1 header contains "rank" → use it; otherwise we'll INSERT a new column
+    ug_has_rank_col = False
+    if ug_col:
+        next_hdr = str(headers[ug_col] if ug_col < len(headers) else "").lower()  # 0-indexed
+        if "rank" in next_hdr:
+            ug_has_rank_col = True
+
+    pg_has_rank_col = False
+    if pg_col:
+        next_hdr_pg = str(headers[pg_col] if pg_col < len(headers) else "").lower()
+        if "rank" in next_hdr_pg:
+            pg_has_rank_col = True
 
     # ── Build output workbook ──────────────────────────────────────────────
     wb_out = openpyxl.Workbook()
 
-    # ─ Sheet 1: Original data + ranks filled ──────────────────────────────
+    # ─ Sheet 1: Build headers list — insert "Rank" if missing ─────────────
     ws1 = wb_out.active
     ws1.title = "Applicant Data with Ranks"
 
@@ -169,8 +180,29 @@ async def process_excel(file: UploadFile = File(...)):
     null_font = Font(name="Calibri", italic=True, color="9CA3AF", size=10)
     alt_fill  = PatternFill("solid", fgColor="F0F7FF")
 
-    # Copy headers
-    for c, h in enumerate(headers, 1):
+    # Build new headers list (insert Rank columns where missing)
+    new_headers = list(headers)
+    ug_rank_out_col = None   # 1-based column in OUTPUT
+    pg_rank_out_col = None
+
+    insert_ug = 0  # how many columns were inserted before PG col
+    if ug_col and not ug_has_rank_col:
+        # Insert "Rank" column right after ug_col
+        new_headers.insert(ug_col, "Rank")  # ug_col is 0-indexed insert position (after index ug_col-1)
+        insert_ug = 1
+        ug_rank_out_col = ug_col + 1  # 1-based: original ug_col is still ug_col, rank is ug_col+1
+    elif ug_col and ug_has_rank_col:
+        ug_rank_out_col = ug_col + 1  # already exists
+
+    if pg_col and not pg_has_rank_col:
+        pg_col_adj = pg_col + insert_ug  # adjusted for any UG insertion
+        new_headers.insert(pg_col_adj, "Rank")  # insert rank after pg university col
+        pg_rank_out_col = pg_col_adj + 1
+    elif pg_col and pg_has_rank_col:
+        pg_rank_out_col = pg_col + insert_ug + 1
+
+    # Write headers to ws1
+    for c, h in enumerate(new_headers, 1):
         cell = ws1.cell(row=1, column=c, value=h)
         cell.font = hdr_font
         cell.fill = hdr_fill
@@ -182,50 +214,55 @@ async def process_excel(file: UploadFile = File(...)):
     # List of (original_input_name, rank_string) — one per applicant row
     ug_tab2_rows = []   # [(original_ug_name, rank_str), ...]
 
-    # Copy rows + fill ranks
+    # Copy rows + fill ranks, mapping input columns → output columns (with possible rank col insertions)
     for row_idx in range(2, ws_in.max_row + 1):
         is_alt = (row_idx % 2 == 0)
         row_fill = alt_fill if is_alt else None
 
-        for col_idx in range(1, ws_in.max_column + 1):
-            val = ws_in.cell(row=row_idx, column=col_idx).value
-            cell = ws1.cell(row=row_idx, column=col_idx, value=val)
+        out_col = 1
+        for in_col in range(1, ws_in.max_column + 1):
+            # If we inserted a UG rank column, skip that output slot when copying regular data
+            if ug_col and not ug_has_rank_col and out_col == ug_col + 1:
+                out_col += 1  # leave slot for inserted UG Rank
+            if pg_col and not pg_has_rank_col and out_col == pg_col + insert_ug + 1:
+                out_col += 1  # leave slot for inserted PG Rank
+
+            val = ws_in.cell(row=row_idx, column=in_col).value
+            cell = ws1.cell(row=row_idx, column=out_col, value=val)
             cell.font = data_font
             if row_fill:
                 cell.fill = row_fill
             cell.border = excel_thin_border()
             cell.alignment = Alignment(vertical="center", wrap_text=False)
+            out_col += 1
 
         ws1.row_dimensions[row_idx].height = 16
 
-        # Fill UG rank
-        if ug_col:
+        # Fill UG rank in the correct output column
+        if ug_col and ug_rank_out_col:
             ug_name = ws_in.cell(row=row_idx, column=ug_col).value
             if ug_name and str(ug_name).strip():
                 original_name = str(ug_name).strip()
                 matched = match_college(original_name, colleges)
                 rank_val = rank_display(matched)
-                # Always add to Tab2, even if rank is empty
                 ug_tab2_rows.append((original_name, rank_val))
                 if rank_val:
-                    r_cell = ws1.cell(row=row_idx, column=ug_rank_col) if ug_rank_col else None
-                    if r_cell:
-                        r_cell.value = rank_val
-                        r_cell.font = null_font if rank_val == "null" else rank_font
-                        r_cell.alignment = Alignment(horizontal="center", vertical="center")
+                    r_cell = ws1.cell(row=row_idx, column=ug_rank_out_col)
+                    r_cell.value = rank_val
+                    r_cell.font = null_font if rank_val == "null" else rank_font
+                    r_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Fill PG rank
-        if pg_col:
+        # Fill PG rank in the correct output column
+        if pg_col and pg_rank_out_col:
             pg_name = ws_in.cell(row=row_idx, column=pg_col).value
             if pg_name and str(pg_name).strip():
                 matched = match_college(str(pg_name), colleges)
                 rank_val = rank_display(matched)
                 if rank_val:
-                    r_cell = ws1.cell(row=row_idx, column=pg_rank_col) if pg_rank_col else None
-                    if r_cell:
-                        r_cell.value = rank_val
-                        r_cell.font = null_font if rank_val == "null" else rank_font
-                        r_cell.alignment = Alignment(horizontal="center", vertical="center")
+                    r_cell = ws1.cell(row=row_idx, column=pg_rank_out_col)
+                    r_cell.value = rank_val
+                    r_cell.font = null_font if rank_val == "null" else rank_font
+                    r_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Auto-width for first few key columns
     for col in ws1.columns:
