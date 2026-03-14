@@ -78,6 +78,17 @@ async def download_college_list():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+@api_router.get("/download-college-list-shortnames")
+async def download_college_list_shortnames():
+    file_path = Path("/app/college_rankings_with_shortnames.xlsx")
+    if not file_path.exists():
+        return {"error": "File not found"}
+    return FileResponse(
+        path=str(file_path),
+        filename="BluBridge_College_Rankings_ShortNames_NIRF_2025.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
