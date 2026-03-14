@@ -112,20 +112,14 @@ export default function BluBridgeHome() {
 
       {/* Header */}
       <header data-testid="header"
-        className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 h-16 border-b border-gray-200/60"
-        style={{ backgroundColor: "rgba(245,242,233,0.9)", backdropFilter: "blur(12px)" }}>
-        <div data-testid="logo"
-          className="text-2xl font-extrabold tracking-tighter select-none"
-          style={{ fontFamily: "'Manrope', sans-serif", color: "#111827", letterSpacing: "-0.04em" }}>
-          BLU<span className="inline-block w-7 h-7 bg-[#1A73E8] text-white text-base font-black rounded-md mx-0.5 leading-7 text-center align-middle">B</span>RIDGE
-        </div>
-        <nav className="flex items-center gap-6">
-          <a href="/register-premium" className="text-sm font-medium text-gray-500 hover:text-[#1A73E8] transition-colors">Register</a>
-          <button data-testid="logout-btn"
-            className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-[#1A73E8] transition-colors group">
-            <LogOut size={15} className="group-hover:translate-x-0.5 transition-transform" />Logout
-          </button>
-        </nav>
+        className="sticky top-0 z-50 flex items-center justify-center px-6 md:px-12 h-16 border-b border-gray-200/60"
+        style={{ backgroundColor: "rgba(238, 234, 221, 0.9)", backdropFilter: "blur(12px)" }}>
+        <img
+          data-testid="logo"
+          src="https://customer-assets.emergentagent.com/job_premium-design-ui/artifacts/dwo5zlsk_logo-black121.png"
+          alt="BluBridge"
+          className="object-contain"
+        />
       </header>
 
       <main className="flex-1 px-4 py-10 md:py-14 max-w-5xl mx-auto w-full">
@@ -133,7 +127,7 @@ export default function BluBridgeHome() {
         {/* Hero */}
         <div className="mb-10 text-center">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-[#1A73E8] text-xs font-semibold px-3 py-1.5 rounded-full mb-4 border border-blue-100">
-            <TrendingUp size={12} /> NIRF 2025 Rankings
+            <TrendingUp size={12} /> NIRF 2026 Rankings
           </div>
           <h1 data-testid="hero-title"
             className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight mb-3"
@@ -298,7 +292,7 @@ export default function BluBridgeHome() {
         </div>
 
         {/* DB Admin Card */}
-        <div className="bg-white rounded-2xl p-5 flex items-center justify-between gap-4"
+        {/* <div className="bg-white rounded-2xl p-5 flex items-center justify-between gap-4"
              style={{ boxShadow: "0 4px 16px -4px rgba(0,0,0,0.07)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
@@ -321,7 +315,7 @@ export default function BluBridgeHome() {
             {seedDone ? <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Seeded!</span>
               : seeding ? "Seeding..." : "Seed DB"}
           </button>
-        </div>
+        </div> */}
 
       </main>
 

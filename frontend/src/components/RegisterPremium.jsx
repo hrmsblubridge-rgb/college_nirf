@@ -105,23 +105,15 @@ export default function RegisterPremium() {
       {/* Header */}
       <header
         data-testid="header"
-        className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 h-16 border-b border-gray-200/60"
+        className="sticky top-0 z-50 flex items-center justify-center px-6 md:px-12 h-16 border-b border-gray-200/60"
         style={{ backgroundColor: "rgba(245,242,233,0.85)", backdropFilter: "blur(12px)" }}
       >
-        <div
+        <img
           data-testid="logo"
-          className="text-2xl font-extrabold tracking-tighter select-none"
-          style={{ fontFamily: "'Manrope', sans-serif", color: "#111827", letterSpacing: "-0.04em" }}
-        >
-          BLU<span className="inline-block w-7 h-7 bg-[#1A73E8] text-white text-base font-black rounded-md mx-0.5 leading-7 text-center align-middle">B</span>RIDGE
-        </div>
-        <button
-          data-testid="logout-btn"
-          className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-[#1A73E8] transition-colors duration-200 group"
-        >
-          <LogOut size={15} className="group-hover:translate-x-0.5 transition-transform duration-200" />
-          Logout
-        </button>
+          src="https://customer-assets.emergentagent.com/job_premium-design-ui/artifacts/dwo5zlsk_logo-black121.png"
+          alt="BluBridge"
+          className="object-contain"
+        />
       </header>
 
       {/* Main */}
