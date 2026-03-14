@@ -13,26 +13,39 @@ Create a premium redesigned version of the BluBridge Registration Form as a new 
 
 ## What's Been Implemented (Feb 2026)
 
-### /register-premium page (RegisterPremium.jsx)
-- Premium card with rounded-3xl corners, large box-shadow
-- Blue gradient accent bar at top of card
-- Manrope font for the Registration Form heading
-- Sticky header with frosted glass effect, BluBridge logo, Logout button
-- All original fields: Full Name, Email, Phone (+WhatsApp note), Age, State dropdown, City, Grad Year, College, Degree, Course
-- Section dividers, confirmation checkbox, PROCEED button
-- Dark footer, mobile responsive, data-testid on all elements
+## What's Been Implemented (Mar 2026)
 
-### College Rankings Excel (BluBridge_College_Rankings_NIRF_2025.xlsx)
-- Source: NIRF 2025 Engineering Rankings
-- Total colleges: 301 (100 ranked + 201 null-rank)
-- Columns: Rank | College Name | City | State
-- Top 100: specific NIRF ranks 1-100
-- Band 101-150: 50 colleges (null rank)
-- Band 151-200: 52 colleges (null rank)
-- Band 201-300: 99 colleges (null rank)
-- Color-coded Excel: Blue header, ranked rows in light blue, null rows in light gray
-- Band separator rows for easy navigation
-- Download endpoint: GET /api/download-college-list
+### Home Page (`/`) — BluBridgeHome.jsx
+- Premium BluBridge-branded homepage with beige background, white cards, blue accents
+- **Stats section**: Total Colleges (dynamic from API), NIRF Ranked, Rank Band
+- **Upload Card**: Drag-and-drop or browse to upload Job Post Excel (.xlsx/.xls)
+  - 3-step visual guide (Upload → Auto Match → Download)
+  - Processing state with spinner
+  - Success/error messages with download link
+- **Download Card**: 3 download options
+  - Processed Excel (appears after processing)
+  - NIRF Rankings with Short Names
+  - NIRF Rankings (Original)
+- **Seed DB Card**: One-click seed/refresh 300 colleges to MongoDB
+
+### Backend APIs
+- `POST /api/colleges/seed` - Seeds all 300 colleges into MongoDB
+- `GET /api/colleges` - Paginated college list
+- `GET /api/colleges/stats` - Returns total, ranked, unranked counts
+- `POST /api/process-excel` - Upload Job Post Excel → returns processed Excel:
+  - Tab 1: All original data with Rank UG + Rank PG auto-filled
+  - Tab 2: Ranking Reference (full name + short names + rank pairs)
+  - Matching: exact → short name → fuzzy (threshold 0.82)
+  - Unranked band colleges → "null"
+
+### College Database (MongoDB)
+- 300 colleges: rank, college_name, short_names[], city, state
+- 100 with specific NIRF ranks (1-100)
+- 200 in rank bands (rank = null)
+
+### Excel Files
+- `/api/download-college-list` → Original rankings (Rank | Name | City | State)
+- `/api/download-college-list-shortnames` → With short names (Rank | Name | Short Name | City | State)
 
 ## Colors (Same as Original)
 - Background: #F5F2E9 (beige/cream)

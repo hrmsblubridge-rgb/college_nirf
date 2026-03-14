@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle, X, ArrowRight, Database, TrendingUp, Award, LogOut } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL + "/api";
@@ -39,6 +39,14 @@ export default function BluBridgeHome() {
   const [downloadName, setDownloadName] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [seedDone, setSeedDone] = useState(false);
+  const [stats, setStats] = useState({ total: 300, ranked: 100, unranked: 200 });
+
+  useEffect(() => {
+    fetch(`${API}/colleges/stats`)
+      .then(r => r.json())
+      .then(d => setStats({ total: d.total, ranked: d.ranked, unranked: d.unranked }))
+      .catch(() => {});
+  }, [seedDone]);
   const fileRef = useRef();
 
   const handleDrop = useCallback((e) => {
@@ -139,9 +147,9 @@ export default function BluBridgeHome() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-          <StatCard icon={Database}   value="300"  label="Total Colleges"  color="#1A73E8" />
-          <StatCard icon={Award}      value="100"  label="NIRF Ranked"     color="#0F9D58" />
-          <StatCard icon={FileSpreadsheet} value="200" label="Rank Band" color="#F4B400" />
+          <StatCard icon={Database}   value={stats.total}    label="Total Colleges"  color="#1A73E8" />
+          <StatCard icon={Award}      value={stats.ranked}   label="NIRF Ranked"     color="#0F9D58" />
+          <StatCard icon={FileSpreadsheet} value={stats.unranked} label="Rank Band" color="#F4B400" />
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-6">
