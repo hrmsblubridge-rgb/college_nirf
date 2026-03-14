@@ -7,15 +7,10 @@ Build a college ranking processor application with:
 3. Store ~300 colleges (rank, full name, short names, city, state) in a database
 4. Process uploaded "Job Post appraise" Excel sheets by matching college names against the database and adding NIRF ranks
 5. Center the logo in the global header and remove Register/Login/Logout buttons
-
-## Core Requirements
-- **Homepage**: Upload/Download functionality for Excel processing
-- **College Database**: 300 colleges with rank, name, short names, city, state
-- **Excel Processing**: Match college names (full + short) to NIRF ranks, insert Rank column, generate second tab with original names + ranks
-- **UI**: Centered logo header, no auth buttons globally
+6. Replace null ranks with rank bands (RB:101-150, RB:151-200, RB:201-300); show "NL" for not-listed colleges
 
 ## Tech Stack
-- **Frontend**: React, Tailwind CSS, Shadcn/UI, Axios
+- **Frontend**: React, Tailwind CSS, Shadcn/UI
 - **Backend**: FastAPI, Pandas, Openpyxl
 - **Database**: MongoDB
 
@@ -24,39 +19,48 @@ Build a college ranking processor application with:
 /app/
 ├── backend/
 │   ├── .env
-│   ├── models/college.py
+│   ├── college_data.py       # 300 colleges with ranks + rank bands
 │   ├── requirements.txt
-│   └── server.py
+│   ├── server.py
+│   └── tests/test_rank_bands.py
 ├── frontend/
 │   ├── .env
-│   ├── package.json
 │   └── src/
 │       ├── App.js
 │       └── components/
 │           ├── BluBridgeHome.jsx
 │           └── RegisterPremium.jsx
+├── college_rankings.xlsx
+└── college_rankings_with_shortnames.xlsx
 ```
 
 ## Key API Endpoints
 - `POST /api/process-excel` - Upload and process Excel with college rank matching
-- `GET /api/colleges/stats` - Get college database statistics
-- `GET /api/download-college-list` - Download NIRF rankings (original)
-- `GET /api/download-college-list-shortnames` - Download NIRF rankings with short names
+- `GET /api/colleges/stats` - Stats: 300 total, 100 ranked, 200 rank band
+- `GET /api/download-college-list` - Download NIRF rankings (with rank bands)
+- `GET /api/download-college-list-shortnames` - Download NIRF rankings with short names (with rank bands)
 - `POST /api/colleges/seed` - Seed college database
 
 ## DB Schema
-- **colleges**: `{ name: str, short_names: List[str], city: str, state: str, rank: Union[int, None] }`
+- **colleges**: `{ name: str, short_names: List[str], city: str, state: str, rank: Union[int, str] }`
+  - rank: `int` (1-100) for top colleges, `"RB:101-150"` / `"RB:151-200"` / `"RB:201-300"` for band colleges
 
-## Completed Features (as of 2026-03-14)
+## Rank System
+- **1-100**: Specific NIRF rank (integer)
+- **RB:101-150**: Rank band 101-150 (50 colleges)
+- **RB:151-200**: Rank band 151-200 (52 colleges)
+- **RB:201-300**: Rank band 201-300 (99 colleges)
+- **NL**: Not Listed — shown in processed Excel for colleges not in the database
+
+## Completed Features
 - [x] Premium Registration Page (`/register-premium`)
-- [x] College data seeding (300 colleges into MongoDB)
+- [x] College data seeding (300 colleges with rank bands)
 - [x] Homepage with upload/download functionality
-- [x] Backend Excel processing endpoint with rank matching
-- [x] Bug fix: Data overwrite issue (Graduation Year column preserved)
-- [x] Bug fix: Correct name matching in second tab
-- [x] Header: Logo centered globally
-- [x] Header: Register/Login/Logout buttons removed globally
-- [x] E2E testing passed
+- [x] Backend Excel processing with rank matching + NL for unmatched
+- [x] Header: Logo centered globally, no auth buttons
+- [x] Rank bands replacing null values in DB, download sheets, and processing
+- [x] Static download Excel files regenerated with rank bands
+- [x] All tests passing (iteration_1 + iteration_2)
 
 ## No Pending Tasks
 All user-requested features have been implemented and verified.
