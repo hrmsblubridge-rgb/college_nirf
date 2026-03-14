@@ -71,9 +71,13 @@ def match_college(name: str, colleges: list) -> Optional[dict]:
     return None
 
 def rank_display(c: Optional[dict]) -> str:
+    """Return rank string. 'NL' (Not Listed) if no match found."""
     if c is None:
-        return ""
-    return str(c["rank"]) if c.get("rank") is not None else "null"
+        return "NL"
+    r = c.get("rank")
+    if r is None:
+        return "NL"
+    return str(r)
 
 def excel_thin_border():
     t = Side(style="thin", color="D1D5DB")
@@ -119,8 +123,9 @@ async def get_colleges(skip: int = 0, limit: int = 300):
 @api_router.get("/colleges/stats")
 async def college_stats():
     total = await db.colleges.count_documents({})
-    ranked = await db.colleges.count_documents({"rank": {"$ne": None}})
-    return {"total": total, "ranked": ranked, "unranked": total - ranked}
+    ranked = await db.colleges.count_documents({"rank": {"$type": "int"}})
+    rank_band = await db.colleges.count_documents({"rank": {"$type": "string"}})
+    return {"total": total, "ranked": ranked, "unranked": rank_band}
 
 # ── Excel Processing Route ────────────────────────────────────────────────────
 @api_router.post("/process-excel")
@@ -178,6 +183,8 @@ async def process_excel(file: UploadFile = File(...)):
     data_font = Font(name="Calibri", size=10)
     rank_font = Font(name="Calibri", bold=True, color="1557B0", size=10)
     null_font = Font(name="Calibri", italic=True, color="9CA3AF", size=10)
+    band_font = Font(name="Calibri", bold=True, color="E67E22", size=10)
+    nl_font   = Font(name="Calibri", italic=True, color="DC2626", size=10)
     alt_fill  = PatternFill("solid", fgColor="F0F7FF")
 
     # Build new headers list (insert Rank columns where missing)
@@ -249,7 +256,12 @@ async def process_excel(file: UploadFile = File(...)):
                 if rank_val:
                     r_cell = ws1.cell(row=row_idx, column=ug_rank_out_col)
                     r_cell.value = rank_val
-                    r_cell.font = null_font if rank_val == "null" else rank_font
+                    if rank_val == "NL":
+                        r_cell.font = nl_font
+                    elif rank_val.startswith("RB:"):
+                        r_cell.font = band_font
+                    else:
+                        r_cell.font = rank_font
                     r_cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Fill PG rank in the correct output column
@@ -261,7 +273,12 @@ async def process_excel(file: UploadFile = File(...)):
                 if rank_val:
                     r_cell = ws1.cell(row=row_idx, column=pg_rank_out_col)
                     r_cell.value = rank_val
-                    r_cell.font = null_font if rank_val == "null" else rank_font
+                    if rank_val == "NL":
+                        r_cell.font = nl_font
+                    elif rank_val.startswith("RB:"):
+                        r_cell.font = band_font
+                    else:
+                        r_cell.font = rank_font
                     r_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Auto-width for first few key columns
