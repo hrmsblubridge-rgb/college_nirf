@@ -392,7 +392,7 @@ def band_separator(row, label):
 # ── Helper to write a data row
 def write_row(row, rank_val, name, city, state, is_ranked=True, alt=False):
     bg = (RANKED_ALT if alt else RANKED_BG) if is_ranked else (UNRANKED_ALT if alt else UNRANKED_BG)
-    rank_display = rank_val if rank_val is not None else "null"
+    rank_display = rank_val if rank_val is not None else ""
     values = [rank_display, name, city, state]
     for col, val in enumerate(values, 1):
         c = ws.cell(row=row, column=col, value=val)
@@ -417,24 +417,24 @@ for i, (rank, name, city, state) in enumerate(ranked):
     current_row += 1
 
 # ── Write BAND 101–150
-band_separator(current_row, "RANK BAND: 101–150  (No specific rank within band — shown as null)")
+band_separator(current_row, "RANK BAND: 101–150")
 current_row += 1
 for i, (name, city, state) in enumerate(band_101_150):
-    write_row(current_row, None, name, city, state, is_ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "101-150", name, city, state, is_ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 # ── Write BAND 151–200
-band_separator(current_row, "RANK BAND: 151–200  (No specific rank within band — shown as null)")
+band_separator(current_row, "RANK BAND: 151–200")
 current_row += 1
 for i, (name, city, state) in enumerate(band_151_200):
-    write_row(current_row, None, name, city, state, is_ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "151-200", name, city, state, is_ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 # ── Write BAND 201–300
-band_separator(current_row, "RANK BAND: 201–300  (No specific rank within band — shown as null)")
+band_separator(current_row, "RANK BAND: 201–300")
 current_row += 1
 for i, (name, city, state) in enumerate(band_201_300):
-    write_row(current_row, None, name, city, state, is_ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "201-300", name, city, state, is_ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 # ── Freeze panes

@@ -259,7 +259,7 @@ async def process_excel(file: UploadFile = File(...)):
                     r_cell.value = rank_val
                     if rank_val == "NL":
                         r_cell.font = nl_font
-                    elif rank_val.startswith("RB:"):
+                    elif rank_val.startswith(("101-", "151-", "201-")):
                         r_cell.font = band_font
                     else:
                         r_cell.font = rank_font
@@ -276,7 +276,7 @@ async def process_excel(file: UploadFile = File(...)):
                     r_cell.value = rank_val
                     if rank_val == "NL":
                         r_cell.font = nl_font
-                    elif rank_val.startswith("RB:"):
+                    elif rank_val.startswith(("101-", "151-", "201-")):
                         r_cell.font = band_font
                     else:
                         r_cell.font = rank_font

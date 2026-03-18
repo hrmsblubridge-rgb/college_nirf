@@ -47,9 +47,9 @@ Build a college ranking processor application with:
 
 ## Rank System
 - **1-100**: Specific NIRF rank (integer)
-- **RB:101-150**: Rank band 101-150 (50 colleges)
-- **RB:151-200**: Rank band 151-200 (52 colleges)
-- **RB:201-300**: Rank band 201-300 (99 colleges)
+- **101-150**: Rank band 101-150 (50 colleges)
+- **151-200**: Rank band 151-200 (52 colleges)
+- **201-300**: Rank band 201-300 (99 colleges)
 - **NL**: Not Listed — shown in processed Excel for colleges not in the database
 
 ## Completed Features

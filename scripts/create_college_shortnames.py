@@ -395,7 +395,7 @@ def band_sep(row, label):
 
 def write_row(row, rank_val, name, short, city, state, ranked=True, alt=False):
     bg = (RANKED_ALT if alt else RANKED_BG) if ranked else (UNRANKED_ALT if alt else UNRANKED_BG)
-    vals = [rank_val if rank_val is not None else "null", name, short, city, state]
+    vals = [rank_val if rank_val is not None else "", name, short, city, state]
     for c, v in enumerate(vals, 1):
         cell = ws.cell(row=row, column=c, value=v)
         cell.fill = PatternFill("solid", fgColor=bg)
@@ -421,24 +421,24 @@ for i, (rank, name, short, city, state) in enumerate(ranked):
     current_row += 1
 
 # BAND 101-150
-band_sep(current_row, "RANK BAND: 101–150  |  Rank = null (no specific rank within band)")
+band_sep(current_row, "RANK BAND: 101–150")
 current_row += 1
 for i, (name, short, city, state) in enumerate(band_101_150):
-    write_row(current_row, None, name, short, city, state, ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "101-150", name, short, city, state, ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 # BAND 151-200
-band_sep(current_row, "RANK BAND: 151–200  |  Rank = null (no specific rank within band)")
+band_sep(current_row, "RANK BAND: 151–200")
 current_row += 1
 for i, (name, short, city, state) in enumerate(band_151_200):
-    write_row(current_row, None, name, short, city, state, ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "151-200", name, short, city, state, ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 # BAND 201-300
-band_sep(current_row, "RANK BAND: 201–300  |  Rank = null (no specific rank within band)")
+band_sep(current_row, "RANK BAND: 201–300")
 current_row += 1
 for i, (name, short, city, state) in enumerate(band_201_300):
-    write_row(current_row, None, name, short, city, state, ranked=False, alt=(i % 2 == 1))
+    write_row(current_row, "201-300", name, short, city, state, ranked=False, alt=(i % 2 == 1))
     current_row += 1
 
 ws.freeze_panes = "A4"
