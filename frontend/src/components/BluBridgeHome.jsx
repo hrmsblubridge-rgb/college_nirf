@@ -296,7 +296,7 @@ export default function BluBridgeHome() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold text-gray-800">All India Colleges</p>
-                    <p className="text-xs text-emerald-600 font-medium">37,000+ colleges — Name | NIRF Rank / NL</p>
+                    <p className="text-xs text-emerald-600 font-medium">42,000+ colleges — Rank | Name | Short Name | City | State</p>
                   </div>
                   <ArrowRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
                 </a>
