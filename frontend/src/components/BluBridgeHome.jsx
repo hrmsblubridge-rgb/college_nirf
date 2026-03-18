@@ -286,6 +286,20 @@ export default function BluBridgeHome() {
                   </div>
                   <ArrowRight size={16} className="text-gray-400 group-hover:translate-x-0.5 transition-transform" />
                 </a>
+
+                {/* All India Colleges */}
+                <a href={`${API}/download-all-india-colleges`} data-testid="download-all-india-btn"
+                  className="flex items-center gap-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100
+                    hover:bg-emerald-100 hover:border-emerald-200 transition-all group cursor-pointer">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <Database size={18} className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-800">All India Colleges</p>
+                    <p className="text-xs text-emerald-600 font-medium">37,000+ colleges — Name | NIRF Rank / NL</p>
+                  </div>
+                  <ArrowRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                </a>
               </div>
             </div>
           </div>

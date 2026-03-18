@@ -15,6 +15,7 @@ from difflib import SequenceMatcher
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from college_data import COLLEGES
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -360,6 +361,42 @@ async def download_college_list_shortnames():
         raise HTTPException(404, "File not found")
     return FileResponse(str(file_path),
         filename="BluBridge_College_Rankings_ShortNames_NIRF_2025.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+# ── All-India Colleges Routes ─────────────────────────────────────────────────
+@api_router.post("/all-india-colleges/seed")
+async def seed_all_india_colleges():
+    """Seed all ~37K Indian colleges into MongoDB with NIRF rank matching."""
+    json_path = Path("/tmp/all_india_colleges.json")
+    if not json_path.exists():
+        raise HTTPException(404, "College data file not found. Generate it first.")
+    with open(json_path) as f:
+        records = json.load(f)
+    await db.all_india_colleges.drop()
+    await db.all_india_colleges.create_index("college_name")
+    await db.all_india_colleges.create_index("rank")
+    # Insert in batches
+    batch_size = 5000
+    total = 0
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i+batch_size]
+        result = await db.all_india_colleges.insert_many(batch)
+        total += len(result.inserted_ids)
+    return {"seeded": total, "message": f"{total} Indian colleges loaded into database"}
+
+@api_router.get("/all-india-colleges/stats")
+async def all_india_stats():
+    total = await db.all_india_colleges.count_documents({})
+    ranked = await db.all_india_colleges.count_documents({"rank": {"$ne": "NL"}})
+    return {"total": total, "ranked": ranked, "nl": total - ranked}
+
+@api_router.get("/download-all-india-colleges")
+async def download_all_india_colleges():
+    file_path = Path("/app/frontend/public/indian_colleges_sorted.xlsx")
+    if not file_path.exists():
+        raise HTTPException(404, "File not found")
+    return FileResponse(str(file_path),
+        filename="All_India_Colleges_with_Ranks.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ── App Setup ─────────────────────────────────────────────────────────────────

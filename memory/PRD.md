@@ -66,5 +66,13 @@ Build a college ranking processor application with:
   - File: `/frontend/public/indian_colleges_sorted.xlsx`
   - Source: AISHE government dataset (data.gov.in) via GitHub mirror
 
+- [x] Generated comprehensive Indian colleges Excel (37,244 colleges, alphabetically sorted)
+  - File: `/frontend/public/indian_colleges_sorted.xlsx`
+  - Source: AISHE government dataset (data.gov.in) via GitHub mirror
+- [x] All India Colleges seeded to MongoDB (`all_india_colleges` collection) with NIRF rank matching
+  - 240 colleges matched to NIRF ranks, 37,004 marked as "NL"
+  - API: `GET /api/download-all-india-colleges`, `GET /api/all-india-colleges/stats`, `POST /api/all-india-colleges/seed`
+- [x] Download card added to homepage for "All India Colleges" Excel
+
 ## No Pending Tasks
 All user-requested features have been implemented and verified.
