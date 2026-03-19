@@ -127,7 +127,7 @@ export default function BluBridgeHome() {
         {/* Hero */}
         <div className="mb-10 text-center">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-[#1A73E8] text-xs font-semibold px-3 py-1.5 rounded-full mb-4 border border-blue-100">
-            <TrendingUp size={12} /> NIRF 2026 Rankings
+            <TrendingUp size={12} /> NIRF 2025 Rankings
           </div>
           <h1 data-testid="hero-title"
             className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight mb-3"
