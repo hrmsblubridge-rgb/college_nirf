@@ -305,6 +305,24 @@ export default function BluBridgeHome() {
           </div>
         </div>
 
+        {/* Excel Matcher Link */}
+        <div className="mb-6">
+          <a href="/excel-matcher" data-testid="excel-matcher-link"
+            className="bg-white rounded-2xl p-5 flex items-center justify-between gap-4 hover:shadow-lg transition-all cursor-pointer block"
+            style={{ boxShadow: "0 4px 16px -4px rgba(0,0,0,0.07)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
+                <ArrowRight size={18} className="text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">Excel Matcher — Shortlist / Reject</p>
+                <p className="text-xs text-gray-400">Upload 2 sheets, match by phone number, get status tagged</p>
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-gray-400" />
+          </a>
+        </div>
+
         {/* DB Admin Card */}
         {/* <div className="bg-white rounded-2xl p-5 flex items-center justify-between gap-4"
              style={{ boxShadow: "0 4px 16px -4px rgba(0,0,0,0.07)" }}>

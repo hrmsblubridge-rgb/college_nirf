@@ -399,6 +399,155 @@ async def download_all_india_colleges():
         filename="All_India_Colleges_with_Ranks.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+# ── Excel Matcher: Match two Excel sheets by phone number ─────────────────────
+import re as _re
+import pandas as pd
+
+def normalize_phone(val):
+    """Extract last 10 digits from phone number for matching."""
+    if pd.isna(val) or val is None:
+        return ''
+    s = _re.sub(r'[^0-9]', '', str(val).strip())
+    return s[-10:] if len(s) >= 10 else s
+
+@api_router.post("/excel-matcher/preview")
+async def excel_matcher_preview(
+    left_file: UploadFile = File(...),
+    right_file: UploadFile = File(...)
+):
+    """Preview columns from both uploaded Excel files."""
+    try:
+        left_bytes = await left_file.read()
+        right_bytes = await right_file.read()
+
+        left_df = pd.read_excel(io.BytesIO(left_bytes))
+        right_df = pd.read_excel(io.BytesIO(right_bytes))
+
+        # Save to temp for later processing
+        left_path = Path("/tmp/matcher_left.xlsx")
+        right_path = Path("/tmp/matcher_right.xlsx")
+        left_path.write_bytes(left_bytes)
+        right_path.write_bytes(right_bytes)
+
+        return {
+            "left_columns": list(left_df.columns),
+            "right_columns": list(right_df.columns),
+            "left_rows": len(left_df),
+            "right_rows": len(right_df),
+            "left_sample": left_df.head(3).fillna('').to_dict(orient='records'),
+            "right_sample": right_df.head(3).fillna('').to_dict(orient='records'),
+        }
+    except Exception as e:
+        raise HTTPException(400, f"Error reading Excel files: {str(e)}")
+
+
+@api_router.post("/excel-matcher/process")
+async def excel_matcher_process(
+    left_phone_col: str,
+    right_phone_col: str,
+    right_status_col: str,
+):
+    """Match left sheet with right sheet by phone, add Shortlist/Reject column, return file."""
+    import xlsxwriter as _xw
+
+    left_path = Path("/tmp/matcher_left.xlsx")
+    right_path = Path("/tmp/matcher_right.xlsx")
+
+    if not left_path.exists() or not right_path.exists():
+        raise HTTPException(400, "Please upload both files first via /excel-matcher/preview")
+
+    left_df = pd.read_excel(left_path)
+    right_df = pd.read_excel(right_path)
+
+    if left_phone_col not in left_df.columns:
+        raise HTTPException(400, f"Column '{left_phone_col}' not found in left file")
+    if right_phone_col not in right_df.columns:
+        raise HTTPException(400, f"Column '{right_phone_col}' not found in right file")
+    if right_status_col not in right_df.columns:
+        raise HTTPException(400, f"Column '{right_status_col}' not found in right file")
+
+    # Build phone→status lookup from right sheet
+    phone_status = {}
+    for _, row in right_df.iterrows():
+        phone = normalize_phone(row.get(right_phone_col))
+        status = str(row.get(right_status_col, '')).strip()
+        if phone and status:
+            phone_status[phone] = status
+
+    # Match and add column to left sheet
+    statuses = []
+    matched = 0
+    for _, row in left_df.iterrows():
+        phone = normalize_phone(row.get(left_phone_col))
+        status = phone_status.get(phone, '')
+        if status:
+            matched += 1
+        statuses.append(status)
+
+    # Insert "Shortlist / Reject" column right after the phone column
+    phone_col_idx = list(left_df.columns).index(left_phone_col)
+    left_df.insert(phone_col_idx + 1, 'Shortlist / Reject', statuses)
+
+    # Write output with xlsxwriter
+    output_path = Path("/tmp/matcher_result.xlsx")
+    wb = _xw.Workbook(str(output_path), {'strings_to_numbers': False})
+    ws = wb.add_worksheet('Matched Results')
+
+    # Formats
+    hdr_fmt = wb.add_format({'bold': True, 'font_color': 'white', 'bg_color': '#1A73E8',
+        'font_size': 11, 'font_name': 'Calibri', 'align': 'center', 'valign': 'vcenter',
+        'text_wrap': True, 'border': 1})
+    data_fmt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
+        'border_color': '#D1D5DB', 'valign': 'vcenter'})
+    data_alt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
+        'border_color': '#D1D5DB', 'valign': 'vcenter', 'bg_color': '#F0F7FF'})
+    shortlist_fmt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
+        'bold': True, 'font_color': '#16A34A', 'bg_color': '#DCFCE7', 'align': 'center', 'valign': 'vcenter'})
+    reject_fmt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
+        'bold': True, 'font_color': '#DC2626', 'bg_color': '#FEE2E2', 'align': 'center', 'valign': 'vcenter'})
+    empty_fmt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
+        'font_color': '#9CA3AF', 'align': 'center', 'valign': 'vcenter', 'italic': True})
+
+    # Headers
+    status_col_idx = phone_col_idx + 1
+    for ci, col in enumerate(left_df.columns):
+        ws.write(0, ci, str(col), hdr_fmt)
+        ws.set_column(ci, ci, max(15, len(str(col)) + 4))
+    ws.set_row(0, 28)
+
+    # Data
+    for ri, (_, row) in enumerate(left_df.iterrows()):
+        r = ri + 1
+        alt = r % 2 == 0
+        for ci, col in enumerate(left_df.columns):
+            val = row[col]
+            cell_val = '' if pd.isna(val) else str(val)
+
+            if ci == status_col_idx:
+                # Status column - special formatting
+                low = cell_val.lower().strip()
+                if 'shortlist' in low:
+                    ws.write(r, ci, cell_val, shortlist_fmt)
+                elif 'reject' in low:
+                    ws.write(r, ci, cell_val, reject_fmt)
+                else:
+                    ws.write(r, ci, cell_val if cell_val else 'Not Found', empty_fmt)
+            else:
+                ws.write(r, ci, cell_val, data_alt if alt else data_fmt)
+
+    ws.freeze_panes(1, 0)
+    ws.autofilter(0, 0, len(left_df), len(left_df.columns) - 1)
+    wb.close()
+
+    return FileResponse(
+        str(output_path),
+        filename="Matched_Results.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"X-Matched": str(matched), "X-Total": str(len(left_df)),
+                 "X-Unmatched": str(len(left_df) - matched)}
+    )
+
+
 # ── App Setup ─────────────────────────────────────────────────────────────────
 app.include_router(api_router)
 app.add_middleware(
