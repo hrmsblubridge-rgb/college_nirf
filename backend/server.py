@@ -410,35 +410,94 @@ def normalize_phone(val):
     s = _re.sub(r'[^0-9]', '', str(val).strip())
     return s[-10:] if len(s) >= 10 else s
 
+def detect_header_row(df_raw, max_scan=10):
+    """Find the row that looks like a header (most non-null string values)."""
+    best_row = 0
+    best_score = 0
+    for i in range(min(max_scan, len(df_raw))):
+        row = df_raw.iloc[i]
+        score = sum(1 for v in row if isinstance(v, str) and len(v.strip()) > 1 and not v.startswith('Unnamed'))
+        if score > best_score:
+            best_score = score
+            best_row = i
+    return best_row
+
+def read_sheet_smart(file_bytes, sheet_name=0):
+    """Read a sheet with auto-detected header row."""
+    # First read raw (no header)
+    raw = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=None)
+    if raw.empty:
+        return raw, 0
+    header_row = detect_header_row(raw)
+    # Re-read with correct header
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row)
+    # Drop completely empty rows
+    df = df.dropna(how='all').reset_index(drop=True)
+    # Clean column names
+    df.columns = [str(c).strip() if not str(c).startswith('Unnamed') else str(c) for c in df.columns]
+    return df, header_row
+
 @api_router.post("/excel-matcher/preview")
 async def excel_matcher_preview(
     left_file: UploadFile = File(...),
     right_file: UploadFile = File(...)
 ):
-    """Preview columns from both uploaded Excel files."""
+    """Preview sheet names and columns from both uploaded Excel files."""
     try:
         left_bytes = await left_file.read()
         right_bytes = await right_file.read()
 
-        left_df = pd.read_excel(io.BytesIO(left_bytes))
-        right_df = pd.read_excel(io.BytesIO(right_bytes))
+        # Save to temp
+        Path("/tmp/matcher_left.xlsx").write_bytes(left_bytes)
+        Path("/tmp/matcher_right.xlsx").write_bytes(right_bytes)
 
-        # Save to temp for later processing
-        left_path = Path("/tmp/matcher_left.xlsx")
-        right_path = Path("/tmp/matcher_right.xlsx")
-        left_path.write_bytes(left_bytes)
-        right_path.write_bytes(right_bytes)
+        # Get sheet names
+        left_xl = pd.ExcelFile(io.BytesIO(left_bytes))
+        right_xl = pd.ExcelFile(io.BytesIO(right_bytes))
+        left_sheets = left_xl.sheet_names
+        right_sheets = right_xl.sheet_names
+
+        # Read first sheet of left with smart header detection
+        left_df, left_hdr = read_sheet_smart(left_bytes, left_sheets[0])
+
+        # For right: read all sheets, collect unique columns
+        right_all_cols = set()
+        right_total_rows = 0
+        for sn in right_sheets:
+            rdf, _ = read_sheet_smart(right_bytes, sn)
+            right_all_cols.update([c for c in rdf.columns if not str(c).startswith('Unnamed')])
+            right_total_rows += len(rdf)
 
         return {
-            "left_columns": list(left_df.columns),
-            "right_columns": list(right_df.columns),
+            "left_sheets": left_sheets,
+            "right_sheets": right_sheets,
+            "left_columns": [c for c in left_df.columns if not str(c).startswith('Unnamed')],
+            "left_all_columns": list(left_df.columns),
+            "right_columns": sorted(right_all_cols),
             "left_rows": len(left_df),
-            "right_rows": len(right_df),
-            "left_sample": left_df.head(3).fillna('').to_dict(orient='records'),
-            "right_sample": right_df.head(3).fillna('').to_dict(orient='records'),
+            "right_rows": right_total_rows,
+            "left_header_row": left_hdr,
+            "left_sample": left_df.head(3).fillna('').astype(str).to_dict(orient='records'),
         }
     except Exception as e:
         raise HTTPException(400, f"Error reading Excel files: {str(e)}")
+
+
+@api_router.post("/excel-matcher/preview-sheet")
+async def excel_matcher_preview_sheet(left_sheet: str):
+    """Re-preview left file with a different sheet selected."""
+    try:
+        left_bytes = Path("/tmp/matcher_left.xlsx").read_bytes()
+        left_df, hdr = read_sheet_smart(left_bytes, left_sheet)
+        return {
+            "left_columns": [c for c in left_df.columns if not str(c).startswith('Unnamed')],
+            "left_all_columns": list(left_df.columns),
+            "left_rows": len(left_df),
+            "left_header_row": hdr,
+            "left_sample": left_df.head(3).fillna('').astype(str).to_dict(orient='records'),
+        }
+    except Exception as e:
+        raise HTTPException(400, f"Error reading sheet: {str(e)}")
 
 
 @api_router.post("/excel-matcher/process")
@@ -446,8 +505,9 @@ async def excel_matcher_process(
     left_phone_col: str,
     right_phone_col: str,
     right_status_col: str,
+    left_sheet: str = "0",
 ):
-    """Match left sheet with right sheet by phone, add Shortlist/Reject column, return file."""
+    """Match left sheet with ALL right sheets by phone, add Shortlist/Reject column."""
     import xlsxwriter as _xw
 
     left_path = Path("/tmp/matcher_left.xlsx")
@@ -456,25 +516,34 @@ async def excel_matcher_process(
     if not left_path.exists() or not right_path.exists():
         raise HTTPException(400, "Please upload both files first via /excel-matcher/preview")
 
-    left_df = pd.read_excel(left_path)
-    right_df = pd.read_excel(right_path)
+    left_bytes = left_path.read_bytes()
+    right_bytes = right_path.read_bytes()
 
+    # Read left sheet
+    left_df, _ = read_sheet_smart(left_bytes, left_sheet)
     if left_phone_col not in left_df.columns:
-        raise HTTPException(400, f"Column '{left_phone_col}' not found in left file")
-    if right_phone_col not in right_df.columns:
-        raise HTTPException(400, f"Column '{right_phone_col}' not found in right file")
-    if right_status_col not in right_df.columns:
-        raise HTTPException(400, f"Column '{right_status_col}' not found in right file")
+        raise HTTPException(400, f"Column '{left_phone_col}' not found in left sheet '{left_sheet}'")
 
-    # Build phone→status lookup from right sheet
+    # Build phone→status lookup from ALL right sheets
     phone_status = {}
-    for _, row in right_df.iterrows():
-        phone = normalize_phone(row.get(right_phone_col))
-        status = str(row.get(right_status_col, '')).strip()
-        if phone and status:
-            phone_status[phone] = status
+    right_xl = pd.ExcelFile(io.BytesIO(right_bytes))
+    for sn in right_xl.sheet_names:
+        try:
+            rdf, _ = read_sheet_smart(right_bytes, sn)
+            if right_phone_col not in rdf.columns or right_status_col not in rdf.columns:
+                continue
+            for _, row in rdf.iterrows():
+                phone = normalize_phone(row.get(right_phone_col))
+                status = str(row.get(right_status_col, '')).strip()
+                if phone and status and status != 'nan':
+                    phone_status[phone] = status
+        except Exception:
+            continue
 
-    # Match and add column to left sheet
+    if not phone_status:
+        raise HTTPException(400, f"No valid phone/status data found in right file columns '{right_phone_col}'/'{right_status_col}'")
+
+    # Match and add column
     statuses = []
     matched = 0
     for _, row in left_df.iterrows():
@@ -484,16 +553,14 @@ async def excel_matcher_process(
             matched += 1
         statuses.append(status)
 
-    # Insert "Shortlist / Reject" column right after the phone column
     phone_col_idx = list(left_df.columns).index(left_phone_col)
     left_df.insert(phone_col_idx + 1, 'Shortlist / Reject', statuses)
 
-    # Write output with xlsxwriter
+    # Write output
     output_path = Path("/tmp/matcher_result.xlsx")
     wb = _xw.Workbook(str(output_path), {'strings_to_numbers': False})
     ws = wb.add_worksheet('Matched Results')
 
-    # Formats
     hdr_fmt = wb.add_format({'bold': True, 'font_color': 'white', 'bg_color': '#1A73E8',
         'font_size': 11, 'font_name': 'Calibri', 'align': 'center', 'valign': 'vcenter',
         'text_wrap': True, 'border': 1})
@@ -508,23 +575,19 @@ async def excel_matcher_process(
     empty_fmt = wb.add_format({'font_size': 10, 'font_name': 'Calibri', 'border': 1,
         'font_color': '#9CA3AF', 'align': 'center', 'valign': 'vcenter', 'italic': True})
 
-    # Headers
     status_col_idx = phone_col_idx + 1
     for ci, col in enumerate(left_df.columns):
         ws.write(0, ci, str(col), hdr_fmt)
         ws.set_column(ci, ci, max(15, len(str(col)) + 4))
     ws.set_row(0, 28)
 
-    # Data
     for ri, (_, row) in enumerate(left_df.iterrows()):
         r = ri + 1
         alt = r % 2 == 0
         for ci, col in enumerate(left_df.columns):
             val = row[col]
             cell_val = '' if pd.isna(val) else str(val)
-
             if ci == status_col_idx:
-                # Status column - special formatting
                 low = cell_val.lower().strip()
                 if 'shortlist' in low:
                     ws.write(r, ci, cell_val, shortlist_fmt)

@@ -1,16 +1,16 @@
 import React, { useState, useCallback } from "react";
-import { Upload, FileSpreadsheet, ArrowRight, Download, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ArrowLeftRight } from "lucide-react";
+import { Upload, FileSpreadsheet, ArrowRight, Download, CheckCircle2, AlertCircle, ChevronLeft, ArrowLeftRight, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_BACKEND_URL + "/api";
 
 export default function ExcelMatcher() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1=upload, 2=configure, 3=result
+  const [step, setStep] = useState(1);
   const [leftFile, setLeftFile] = useState(null);
   const [rightFile, setRightFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [config, setConfig] = useState({ leftPhone: '', rightPhone: '', rightStatus: '' });
+  const [config, setConfig] = useState({ leftPhone: '', rightPhone: '', rightStatus: '', leftSheet: '' });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -28,15 +28,15 @@ export default function ExcelMatcher() {
       const data = await res.json();
       setPreview(data);
 
-      // Auto-detect phone & status columns
-      const phoneKeywords = ['phone', 'mobile', 'contact', 'number', 'tel'];
-      const statusKeywords = ['status', 'shortlist', 'reject', 'result', 'decision'];
-      const findCol = (cols, keywords) => cols.find(c => keywords.some(k => c.toLowerCase().includes(k))) || '';
+      const phoneKw = ['phone', 'mobile', 'contact', 'number', 'tel'];
+      const statusKw = ['status', 'shortlist', 'reject', 'result', 'decision'];
+      const find = (cols, kw) => cols.find(c => kw.some(k => c.toLowerCase().includes(k))) || '';
 
       setConfig({
-        leftPhone: findCol(data.left_columns, phoneKeywords),
-        rightPhone: findCol(data.right_columns, phoneKeywords),
-        rightStatus: findCol(data.right_columns, statusKeywords),
+        leftSheet: data.left_sheets[0],
+        leftPhone: find(data.left_columns, phoneKw),
+        rightPhone: find(data.right_columns, phoneKw),
+        rightStatus: find(data.right_columns, statusKw),
       });
       setStep(2);
     } catch (e) {
@@ -45,6 +45,24 @@ export default function ExcelMatcher() {
       setLoading(false);
     }
   }, [leftFile, rightFile]);
+
+  const handleSheetChange = useCallback(async (sheetName) => {
+    setConfig(p => ({ ...p, leftSheet: sheetName, leftPhone: '' }));
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/excel-matcher/preview-sheet?left_sheet=${encodeURIComponent(sheetName)}`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Failed to load sheet');
+      const data = await res.json();
+      setPreview(p => ({ ...p, left_columns: data.left_columns, left_all_columns: data.left_all_columns, left_rows: data.left_rows, left_sample: data.left_sample }));
+      const phoneKw = ['phone', 'mobile', 'contact', 'number', 'tel'];
+      const find = (cols, kw) => cols.find(c => kw.some(k => c.toLowerCase().includes(k))) || '';
+      setConfig(p => ({ ...p, leftPhone: find(data.left_columns, phoneKw) }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleProcess = useCallback(async () => {
     if (!config.leftPhone || !config.rightPhone || !config.rightStatus) {
@@ -58,15 +76,14 @@ export default function ExcelMatcher() {
         left_phone_col: config.leftPhone,
         right_phone_col: config.rightPhone,
         right_status_col: config.rightStatus,
+        left_sheet: config.leftSheet,
       });
       const res = await fetch(`${API}/excel-matcher/process?${params}`, { method: 'POST' });
       if (!res.ok) throw new Error((await res.json()).detail || 'Processing failed');
-
       const matched = parseInt(res.headers.get('X-Matched') || '0');
       const total = parseInt(res.headers.get('X-Total') || '0');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-
       setResult({ url, matched, total, unmatched: total - matched });
       setStep(3);
     } catch (e) {
@@ -96,7 +113,7 @@ export default function ExcelMatcher() {
         <div className="flex flex-col items-center gap-2">
           <Upload size={28} className="text-gray-400" />
           <p className="text-sm font-semibold text-gray-600">{label}</p>
-          <p className="text-xs text-gray-400">Drag & drop or click to browse</p>
+          <p className="text-xs text-gray-400">Drag & drop or click</p>
         </div>
       )}
     </div>
@@ -115,7 +132,6 @@ export default function ExcelMatcher() {
 
   return (
     <div className="min-h-screen bg-[#F7F8FA]" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Header */}
       <header data-testid="header" className="w-full py-4 px-6 bg-white border-b border-gray-100 flex items-center justify-center relative">
         <button data-testid="back-home-btn" onClick={() => navigate('/')}
           className="absolute left-6 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
@@ -127,7 +143,6 @@ export default function ExcelMatcher() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-[#1A73E8] px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-3">
             <ArrowLeftRight size={14} /> Excel Matcher
@@ -136,7 +151,7 @@ export default function ExcelMatcher() {
           <p className="text-sm text-gray-500 mt-1">Upload two Excel sheets, match by phone number, get Shortlist/Reject status</p>
         </div>
 
-        {/* Progress Steps */}
+        {/* Progress */}
         <div className="flex items-center justify-center gap-3 mb-8">
           {[{n:1, t:'Upload'}, {n:2, t:'Configure'}, {n:3, t:'Download'}].map(({n, t}, i) => (
             <React.Fragment key={n}>
@@ -149,7 +164,6 @@ export default function ExcelMatcher() {
           ))}
         </div>
 
-        {/* Error */}
         {error && (
           <div data-testid="error-msg" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
             <AlertCircle size={16} /> {error}
@@ -183,7 +197,7 @@ export default function ExcelMatcher() {
           </div>
         )}
 
-        {/* Step 2: Configure Matching */}
+        {/* Step 2: Configure */}
         {step === 2 && preview && (
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="grid grid-cols-2 gap-4 mb-4 text-center">
@@ -193,18 +207,46 @@ export default function ExcelMatcher() {
               </div>
               <div className="bg-emerald-50 rounded-xl p-3">
                 <div className="text-lg font-bold text-emerald-600">{preview.right_rows}</div>
-                <div className="text-xs text-gray-500">Right Sheet Rows</div>
+                <div className="text-xs text-gray-500">Right Sheet Rows (all tabs)</div>
               </div>
             </div>
 
             <div className="space-y-4 mb-6">
+              {/* Left Sheet Config */}
               <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
                 <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-3">Left Sheet (Candidates)</h4>
+
+                {/* Sheet Tab Selector */}
+                {preview.left_sheets && preview.left_sheets.length > 1 && (
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                      <Layers size={12} className="inline mr-1" /> Select Sheet Tab
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {preview.left_sheets.map(s => (
+                        <button key={s} data-testid={`sheet-tab-${s}`}
+                          onClick={() => handleSheetChange(s)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                            ${config.leftSheet === s
+                              ? 'bg-[#1A73E8] text-white shadow-sm'
+                              : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <ColSelect label="Phone Number Column" value={config.leftPhone} testId="left-phone-select"
                   options={preview.left_columns} onChange={v => setConfig(p => ({...p, leftPhone: v}))} />
               </div>
+
+              {/* Right Sheet Config */}
               <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3">Right Sheet (Status)</h4>
+                <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">Right Sheet (Status)</h4>
+                <p className="text-xs text-emerald-600/70 mb-3 flex items-center gap-1">
+                  <Layers size={11} /> Searches across all {preview.right_sheets?.length || 1} sheet tabs automatically
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <ColSelect label="Phone Number Column" value={config.rightPhone} testId="right-phone-select"
                     options={preview.right_columns} onChange={v => setConfig(p => ({...p, rightPhone: v}))} />
@@ -235,7 +277,6 @@ export default function ExcelMatcher() {
               <CheckCircle2 size={32} className="text-green-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Matching Complete!</h2>
-
             <div className="grid grid-cols-3 gap-3 mb-6 max-w-md mx-auto">
               <div className="bg-gray-50 rounded-xl p-3">
                 <div data-testid="total-count" className="text-lg font-bold text-gray-800">{result.total}</div>
@@ -250,12 +291,10 @@ export default function ExcelMatcher() {
                 <div className="text-xs text-gray-500">Not Found</div>
               </div>
             </div>
-
             <a data-testid="download-result-btn" href={result.url} download="Matched_Results.xlsx"
               className="inline-flex items-center gap-2 px-6 py-3 bg-[#1A73E8] text-white rounded-xl text-sm font-bold hover:bg-[#1557B0] transition-all">
               <Download size={16} /> Download Result
             </a>
-
             <button data-testid="start-over-btn" onClick={() => { setStep(1); setLeftFile(null); setRightFile(null); setPreview(null); setResult(null); setError(''); }}
               className="block mx-auto mt-4 text-sm text-gray-500 hover:text-gray-800 transition-colors">
               Start Over

@@ -75,9 +75,9 @@ Build a college ranking processor application with:
 - [x] Download card added to homepage for "All India Colleges" Excel
 
 - [x] Excel Matcher page (`/excel-matcher`) — Upload 2 Excel sheets, match by phone number, tag Shortlist/Reject
-  - Backend: `POST /api/excel-matcher/preview`, `POST /api/excel-matcher/process`
-  - Frontend: `ExcelMatcher.jsx` with 3-step flow (Upload → Configure → Download)
-  - Auto-detects phone/status columns, normalizes phone numbers (last 10 digits)
+  - Backend: `POST /api/excel-matcher/preview`, `POST /api/excel-matcher/preview-sheet`, `POST /api/excel-matcher/process`
+  - Multi-sheet support: User selects sheet tab for left file, right file searches ALL sheets automatically
+  - Auto-detects header row (skips title rows), normalizes phone numbers (last 10 digits)
   - Downloads result with color-coded Shortlist (green) / Reject (red) / Not Found (gray)
 
 ## No Pending Tasks
