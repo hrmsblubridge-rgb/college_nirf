@@ -80,5 +80,8 @@ Build a college ranking processor application with:
   - Auto-detects header row (skips title rows), normalizes phone numbers (last 10 digits)
   - Downloads result with color-coded Shortlist (green) / Reject (red) / Not Found (gray)
 
-## No Pending Tasks
+## Database
+- **Live MongoDB Atlas**: `cluster0.e2vbzbk.mongodb.net/nirf`
+- Collections: `colleges` (300 NIRF), `all_india_colleges` (43,118)
+- Connection: async Motor client with ping verification on startup
 All user-requested features have been implemented and verified.
