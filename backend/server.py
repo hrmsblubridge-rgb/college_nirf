@@ -20,9 +20,25 @@ import json
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# ── Database Connection with logging ─────────────────────────────────────────
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db_name = os.environ['DB_NAME']
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
+        retryWrites=True,
+    )
+    db = client[db_name]
+    logger.info(f"MongoDB client initialized: {db_name}")
+except Exception as e:
+    logger.error(f"MongoDB connection failed: {e}")
+    raise
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -621,6 +637,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_db_client():
+    try:
+        await client.admin.command('ping')
+        logger.info(f"MongoDB connection verified successfully ({db_name})")
+        colls = await db.list_collection_names()
+        logger.info(f"Available collections: {colls}")
+    except Exception as e:
+        logger.error(f"MongoDB connection verification failed: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    logger.info("MongoDB connection closed")
