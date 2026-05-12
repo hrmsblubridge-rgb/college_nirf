@@ -18,6 +18,7 @@ from college_data import COLLEGES
 import json
 
 ROOT_DIR = Path(__file__).parent
+DOWNLOADS_DIR = ROOT_DIR / "data" / "downloads"
 load_dotenv(ROOT_DIR / '.env')
 
 # ── Database Connection with logging ─────────────────────────────────────────
@@ -363,7 +364,7 @@ async def process_excel(file: UploadFile = File(...)):
 # ── Static Excel Downloads ────────────────────────────────────────────────────
 @api_router.get("/download-college-list")
 async def download_college_list():
-    file_path = Path("/app/college_rankings.xlsx")
+    file_path = DOWNLOADS_DIR / "college_rankings.xlsx"
     if not file_path.exists():
         raise HTTPException(404, "File not found")
     return FileResponse(str(file_path),
@@ -372,7 +373,7 @@ async def download_college_list():
 
 @api_router.get("/download-college-list-shortnames")
 async def download_college_list_shortnames():
-    file_path = Path("/app/college_rankings_with_shortnames.xlsx")
+    file_path = DOWNLOADS_DIR / "college_rankings_with_shortnames.xlsx"
     if not file_path.exists():
         raise HTTPException(404, "File not found")
     return FileResponse(str(file_path),
@@ -408,7 +409,7 @@ async def all_india_stats():
 
 @api_router.get("/download-all-india-colleges")
 async def download_all_india_colleges():
-    file_path = Path("/app/frontend/public/indian_colleges_sorted.xlsx")
+    file_path = DOWNLOADS_DIR / "indian_colleges_sorted.xlsx"
     if not file_path.exists():
         raise HTTPException(404, "File not found")
     return FileResponse(str(file_path),
@@ -646,6 +647,10 @@ async def startup_db_client():
         logger.info(f"Available collections: {colls}")
     except Exception as e:
         logger.error(f"MongoDB connection verification failed: {e}")
+    # Verify download files exist
+    for fname in ["college_rankings.xlsx", "college_rankings_with_shortnames.xlsx", "indian_colleges_sorted.xlsx"]:
+        fpath = DOWNLOADS_DIR / fname
+        logger.info(f"Download file {fname}: {'EXISTS' if fpath.exists() else 'MISSING'} ({fpath})")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
