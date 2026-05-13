@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RegisterPremium from "@/components/RegisterPremium";
 import BluBridgeHome from "@/components/BluBridgeHome";
 import ExcelMatcher from "@/components/ExcelMatcher";
+import CollegeDirectory from "@/components/CollegeDirectory";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           <Route path="/" element={<BluBridgeHome />} />
           <Route path="/register-premium" element={<RegisterPremium />} />
           <Route path="/excel-matcher" element={<ExcelMatcher />} />
+          <Route path="/colleges" element={<CollegeDirectory />} />
         </Routes>
       </BrowserRouter>
     </div>

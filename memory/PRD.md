@@ -84,4 +84,10 @@ Build a college ranking processor application with:
 - **Live MongoDB Atlas**: `cluster0.e2vbzbk.mongodb.net/nirf`
 - Collections: `colleges` (300 NIRF), `all_india_colleges` (43,118)
 - Connection: async Motor client with ping verification on startup
+
+## Pages
+- `/` — Home page with stats, upload, downloads
+- `/colleges` — College Directory with search, rank/type filters, pagination
+- `/excel-matcher` — Excel Matcher for Shortlist/Reject tagging
+- `/register-premium` — Registration form
 All user-requested features have been implemented and verified.

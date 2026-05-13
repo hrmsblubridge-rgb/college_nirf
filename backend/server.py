@@ -407,6 +407,104 @@ async def all_india_stats():
     ranked = await db.all_india_colleges.count_documents({"rank": {"$ne": "NL"}})
     return {"total": total, "ranked": ranked, "nl": total - ranked}
 
+
+# ── College Directory API ─────────────────────────────────────────────────────
+import re as _re
+
+def classify_college_type(name):
+    """Auto-classify college type from name."""
+    n = name.lower()
+    if 'indian institute of technology' in n or n.startswith('iit '): return 'IIT'
+    if 'national institute of technology' in n or n.startswith('nit '): return 'NIT'
+    if 'indian institute of information technology' in n or 'iiit' in n: return 'IIIT'
+    if 'indian institute of science' in n and 'education' not in n: return 'IISc/IISER'
+    if 'iiser' in n: return 'IISc/IISER'
+    if 'bits' in n and 'pilani' in n: return 'BITS'
+    if 'deemed' in n: return 'Deemed'
+    if any(k in n for k in ['government', 'govt']): return 'Government'
+    if any(k in n for k in ['university', 'vishwavidyalaya', 'vidyapeeth']): return 'University'
+    if any(k in n for k in ['private', 'pvt']): return 'Private'
+    return 'Institute'
+
+@api_router.get("/colleges/directory")
+async def colleges_directory(
+    search: str = "",
+    rank_filter: str = "",
+    type_filter: str = "",
+    page: int = 1,
+    per_page: int = 50,
+):
+    """List NIRF colleges with search, filter, and pagination."""
+    query = {}
+
+    # Rank filter
+    if rank_filter == "top100":
+        query["rank"] = {"$type": "int"}
+    elif rank_filter == "101-150":
+        query["rank"] = "101-150"
+    elif rank_filter == "151-200":
+        query["rank"] = "151-200"
+    elif rank_filter == "201-300":
+        query["rank"] = "201-300"
+    elif rank_filter == "band":
+        query["rank"] = {"$type": "string", "$ne": "NL"}
+
+    # Search
+    if search:
+        search_regex = {"$regex": _re.escape(search), "$options": "i"}
+        query["$or"] = [
+            {"college_name": search_regex},
+            {"short_names": search_regex},
+            {"city": search_regex},
+            {"state": search_regex},
+        ]
+
+    total = await db.colleges.count_documents(query)
+    skip = (page - 1) * per_page
+
+    # Sort: numeric ranks first (ascending), then string ranks
+    cursor = db.colleges.find(query, {"_id": 0}).skip(skip).limit(per_page)
+    docs = await cursor.to_list(length=per_page)
+
+    # Sort in Python for mixed int/string ranks
+    def rank_sort_key(doc):
+        r = doc.get("rank")
+        if isinstance(r, int):
+            return (0, r)
+        if isinstance(r, str):
+            if r == "101-150": return (1, 101)
+            if r == "151-200": return (1, 151)
+            if r == "201-300": return (1, 201)
+        return (2, 0)
+
+    docs.sort(key=rank_sort_key)
+
+    # Add college_type
+    results = []
+    for doc in docs:
+        doc["college_type"] = classify_college_type(doc.get("college_name", ""))
+        results.append(doc)
+
+    # Type filter (post-query since type is derived)
+    if type_filter:
+        results = [r for r in results if r["college_type"] == type_filter]
+
+    # Get all college types for filter options
+    all_docs = await db.colleges.find({}, {"_id": 0, "college_name": 1}).to_list(length=300)
+    type_counts = {}
+    for d in all_docs:
+        t = classify_college_type(d.get("college_name", ""))
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    return {
+        "colleges": results,
+        "total": total if not type_filter else len(results),
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total + per_page - 1) // per_page),
+        "college_types": type_counts,
+    }
+
 @api_router.get("/download-all-india-colleges")
 async def download_all_india_colleges():
     file_path = DOWNLOADS_DIR / "indian_colleges_sorted.xlsx"

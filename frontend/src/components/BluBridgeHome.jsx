@@ -1,11 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle, X, ArrowRight, Database, TrendingUp, Award, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_BACKEND_URL + "/api";
 
-const StatCard = ({ icon: Icon, value, label, color }) => (
-  <div className="bg-white rounded-2xl p-6 flex items-center gap-4"
-       style={{ boxShadow: "0 4px 16px -4px rgba(0,0,0,0.08)" }}>
+const StatCard = ({ icon: Icon, value, label, color, onClick }) => (
+  <div className="bg-white rounded-2xl p-6 flex items-center gap-4 cursor-pointer hover:shadow-lg transition-all"
+       style={{ boxShadow: "0 4px 16px -4px rgba(0,0,0,0.08)" }}
+       onClick={onClick}
+       data-testid={`stat-card-${label.replace(/\s+/g, '-').toLowerCase()}`}>
     <div className={`w-12 h-12 rounded-xl flex items-center justify-center`}
          style={{ backgroundColor: color + "18" }}>
       <Icon size={22} style={{ color }} />
@@ -14,6 +17,7 @@ const StatCard = ({ icon: Icon, value, label, color }) => (
       <div className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>{value}</div>
       <div className="text-xs text-gray-500 font-medium uppercase tracking-wider">{label}</div>
     </div>
+    <ArrowRight size={14} className="ml-auto text-gray-300" />
   </div>
 );
 
@@ -31,6 +35,7 @@ const Step = ({ num, title, desc, active }) => (
 );
 
 export default function BluBridgeHome() {
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [status, setStatus] = useState("idle"); // idle | uploading | done | error
@@ -141,9 +146,9 @@ export default function BluBridgeHome() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-          <StatCard icon={Database}   value={stats.total}    label="Total Colleges"  color="#1A73E8" />
-          <StatCard icon={Award}      value={stats.ranked}   label="NIRF Ranked"     color="#0F9D58" />
-          <StatCard icon={FileSpreadsheet} value={stats.unranked} label="Rank Band" color="#F4B400" />
+          <StatCard icon={Database}   value={stats.total}    label="Total Colleges"  color="#1A73E8" onClick={() => navigate("/colleges")} />
+          <StatCard icon={Award}      value={stats.ranked}   label="NIRF Ranked"     color="#0F9D58" onClick={() => navigate("/colleges?rank=top100")} />
+          <StatCard icon={FileSpreadsheet} value={stats.unranked} label="Rank Band" color="#F4B400" onClick={() => navigate("/colleges?rank=band")} />
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-6">
