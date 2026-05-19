@@ -90,4 +90,18 @@ Build a college ranking processor application with:
 - `/colleges` — College Directory with search, rank/type filters, pagination
 - `/excel-matcher` — Excel Matcher for Shortlist/Reject tagging
 - `/register-premium` — Registration form
+
+## Performance Optimizations (Feb 2026)
+- **Issue**: `/api/process-excel` took 41s for 8000-row files, causing Kubernetes ingress timeout and "Response.json: Body has already been consumed" error in browser.
+- **Root cause**: (1) `match_cached` was defined but never invoked — fuzzy `SequenceMatcher` ran for every row instead of every unique name. (2) `excel_thin_border()` + `Alignment(...)` objects re-created per cell × 80K+ cells. (3) `for col in ws1.columns` auto-width loop re-scanned all data cells.
+- **Fix applied in `/app/backend/server.py`**:
+  - Wired `match_cached(name)` per-name memoization into both UG & PG rank loops.
+  - Pre-built `SHARED_BORDER`, `DATA_ALIGN`, `HDR_ALIGN`, `CENTER_ALIGN` once and reused across all cells.
+  - Replaced `ws_in.cell(row,col)` calls with `iter_rows(values_only=True)`.
+  - Removed `for col in ws1.columns` width scan; use header-length only.
+- **Fix applied in `/app/frontend/src/components/BluBridgeHome.jsx`**:
+  - Replaced fragile `await res.json()` error path with `await res.text()` then safe `JSON.parse` (avoids "body consumed" errors on empty/HTML proxy responses).
+- **Result**: 1500 rows: 8.3s → 1.3s (6.4x). 8000 rows: 41s → 5.5s (7.5x). Live endpoint round-trip 6.6s.
+- Verified via direct curl against live preview URL — HTTP 200, valid xlsx output.
+
 All user-requested features have been implemented and verified.

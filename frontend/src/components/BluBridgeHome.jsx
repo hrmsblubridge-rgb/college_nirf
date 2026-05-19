@@ -83,8 +83,15 @@ export default function BluBridgeHome() {
       formData.append("file", file);
       const res = await fetch(`${API}/process-excel`, { method: "POST", body: formData });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Processing failed");
+        // Read body as text first (safer than .json() — won't throw "body consumed" on empty/HTML errors)
+        let detail = `Processing failed (HTTP ${res.status})`;
+        try {
+          const txt = await res.text();
+          if (txt) {
+            try { detail = JSON.parse(txt).detail || detail; } catch { detail = txt.slice(0, 200); }
+          }
+        } catch {}
+        throw new Error(detail);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

@@ -61,30 +61,80 @@ class StatusCheckCreate(BaseModel):
 def normalize(s: str) -> str:
     return s.lower().strip() if s else ""
 
+def normalize_deep(s: str) -> str:
+    """Normalize for matching: lowercase, remove commas/extra spaces/punctuation."""
+    import re
+    s = s.lower().strip()
+    s = re.sub(r'[,\.\-\(\)\'\"]+', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+# Pre-built lookup caches (populated once per request)
+_college_cache = {"built": False, "exact": {}, "exact_deep": {}, "short_exact": {}, "short_deep": {}, "all_entries": []}
+
+def build_college_cache(colleges: list):
+    """Build fast lookup dicts from college list. Called once per request."""
+    if _college_cache["built"]:
+        return
+    _college_cache["exact"].clear()
+    _college_cache["exact_deep"].clear()
+    _college_cache["short_exact"].clear()
+    _college_cache["short_deep"].clear()
+    _college_cache["all_entries"] = colleges
+
+    for c in colleges:
+        n = normalize(c["college_name"])
+        nd = normalize_deep(c["college_name"])
+        _college_cache["exact"][n] = c
+        _college_cache["exact_deep"][nd] = c
+        for s in c.get("short_names", []):
+            sn = normalize(s)
+            sd = normalize_deep(s)
+            _college_cache["short_exact"][sn] = c
+            _college_cache["short_deep"][sd] = c
+    _college_cache["built"] = True
+
 def match_college(name: str, colleges: list) -> Optional[dict]:
-    """Match college name (full or short) against DB. Returns college doc or None."""
+    """Match college name against DB using fast dict lookups. Fuzzy only as last resort."""
     if not name or not name.strip():
         return None
+
+    build_college_cache(colleges)
     n = normalize(name)
-    # 1. Exact match on full name
-    for c in colleges:
-        if normalize(c["college_name"]) == n:
-            return c
-    # 2. Exact match on any short name
-    for c in colleges:
-        for s in c.get("short_names", []):
-            if normalize(s) == n:
+    nd = normalize_deep(name)
+
+    # 1. Exact full name (O(1))
+    if n in _college_cache["exact"]:
+        return _college_cache["exact"][n]
+    # 2. Deep-normalized full name (O(1))
+    if nd in _college_cache["exact_deep"]:
+        return _college_cache["exact_deep"][nd]
+    # 3. Exact short name (O(1))
+    if n in _college_cache["short_exact"]:
+        return _college_cache["short_exact"][n]
+    # 4. Deep-normalized short name (O(1))
+    if nd in _college_cache["short_deep"]:
+        return _college_cache["short_deep"][nd]
+    # 5. Contains match for longer names (fast scan)
+    if len(n) > 10:
+        for key, c in _college_cache["exact"].items():
+            if len(key) > 10 and (key in n or n in key):
                 return c
-    # 3. Fuzzy match (threshold 0.82)
+    # 6. Fuzzy match only for close misses (threshold 0.85, limited scan)
     best, best_score = None, 0
     for c in colleges:
-        candidates = [c["college_name"]] + c.get("short_names", [])
+        candidates = [normalize(c["college_name"])] + [normalize(s) for s in c.get("short_names", [])]
         for cand in candidates:
-            score = SequenceMatcher(None, n, normalize(cand)).ratio()
+            # Quick length filter — skip if lengths differ by >40%
+            if abs(len(n) - len(cand)) > max(len(n), len(cand)) * 0.4:
+                continue
+            score = SequenceMatcher(None, n, cand).ratio()
             if score > best_score:
                 best_score = score
                 best = c
-    if best_score >= 0.82:
+            if best_score >= 0.95:  # early exit on near-perfect match
+                return best
+    if best_score >= 0.85:
         return best
     return None
 
@@ -151,10 +201,23 @@ async def process_excel(file: UploadFile = File(...)):
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(400, "Please upload an Excel file (.xlsx or .xls)")
 
+    # Reset cache for fresh matching
+    _college_cache["built"] = False
+    _match_result_cache = {}  # Cache: name -> matched college
+
     # Load colleges from DB
     colleges = await db.colleges.find({}, {"_id": 0}).to_list(500)
     if not colleges:
         colleges = COLLEGES  # fallback to in-memory
+
+    def match_cached(name):
+        """Match with per-name caching — same name returns instantly."""
+        if not name or not str(name).strip():
+            return None
+        key = str(name).strip()
+        if key not in _match_result_cache:
+            _match_result_cache[key] = match_college(key, colleges)
+        return _match_result_cache[key]
 
     # Read uploaded Excel
     content = await file.read()
@@ -205,6 +268,12 @@ async def process_excel(file: UploadFile = File(...)):
     nl_font   = Font(name="Calibri", italic=True, color="DC2626", size=10)
     alt_fill  = PatternFill("solid", fgColor="F0F7FF")
 
+    # Pre-build shared style objects ONCE (huge perf win — avoids creating Border/Alignment per cell)
+    SHARED_BORDER     = excel_thin_border()
+    DATA_ALIGN        = Alignment(vertical="center", wrap_text=False)
+    HDR_ALIGN         = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    CENTER_ALIGN      = Alignment(horizontal="center", vertical="center")
+
     # Build new headers list (insert Rank columns where missing)
     new_headers = list(headers)
     ug_rank_out_col = None   # 1-based column in OUTPUT
@@ -231,44 +300,55 @@ async def process_excel(file: UploadFile = File(...)):
         cell = ws1.cell(row=1, column=c, value=h)
         cell.font = hdr_font
         cell.fill = hdr_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = excel_thin_border()
+        cell.alignment = HDR_ALIGN
+        cell.border = SHARED_BORDER
     ws1.row_dimensions[1].height = 28
 
     # Track original input names + matched rank for Tab 2
     # List of (original_input_name, rank_string) — one per applicant row
     ug_tab2_rows = []   # [(original_ug_name, rank_str), ...]
 
-    # Copy rows + fill ranks, mapping input columns → output columns (with possible rank col insertions)
-    for row_idx in range(2, ws_in.max_row + 1):
+    # Pre-compute mapping: input col idx (1-based) → output col idx (1-based)
+    # accounting for inserted UG Rank and PG Rank columns
+    input_to_output = {}
+    out_col_walker = 1
+    for in_c in range(1, ws_in.max_column + 1):
+        # Skip slot for inserted UG Rank
+        if ug_col and not ug_has_rank_col and out_col_walker == ug_col + 1:
+            out_col_walker += 1
+        # Skip slot for inserted PG Rank
+        if pg_col and not pg_has_rank_col and out_col_walker == pg_col + insert_ug + 1:
+            out_col_walker += 1
+        input_to_output[in_c] = out_col_walker
+        out_col_walker += 1
+
+    # Iterate via iter_rows (values_only) — much faster than per-cell .cell() lookups
+    row_idx = 1
+    for row_values in ws_in.iter_rows(min_row=2, values_only=True):
+        row_idx += 1
         is_alt = (row_idx % 2 == 0)
         row_fill = alt_fill if is_alt else None
 
-        out_col = 1
-        for in_col in range(1, ws_in.max_column + 1):
-            # If we inserted a UG rank column, skip that output slot when copying regular data
-            if ug_col and not ug_has_rank_col and out_col == ug_col + 1:
-                out_col += 1  # leave slot for inserted UG Rank
-            if pg_col and not pg_has_rank_col and out_col == pg_col + insert_ug + 1:
-                out_col += 1  # leave slot for inserted PG Rank
-
-            val = ws_in.cell(row=row_idx, column=in_col).value
-            cell = ws1.cell(row=row_idx, column=out_col, value=val)
+        # Copy each input cell to its mapped output position
+        for in_c, val in enumerate(row_values, 1):
+            out_c = input_to_output.get(in_c)
+            if out_c is None:
+                continue
+            cell = ws1.cell(row=row_idx, column=out_c, value=val)
             cell.font = data_font
             if row_fill:
                 cell.fill = row_fill
-            cell.border = excel_thin_border()
-            cell.alignment = Alignment(vertical="center", wrap_text=False)
-            out_col += 1
+            cell.border = SHARED_BORDER
+            cell.alignment = DATA_ALIGN
 
         ws1.row_dimensions[row_idx].height = 16
 
         # Fill UG rank in the correct output column
         if ug_col and ug_rank_out_col:
-            ug_name = ws_in.cell(row=row_idx, column=ug_col).value
+            ug_name = row_values[ug_col - 1] if ug_col - 1 < len(row_values) else None
             if ug_name and str(ug_name).strip():
                 original_name = str(ug_name).strip()
-                matched = match_college(original_name, colleges)
+                matched = match_cached(original_name)
                 rank_val = rank_display(matched)
                 ug_tab2_rows.append((original_name, rank_val))
                 if rank_val:
@@ -280,13 +360,13 @@ async def process_excel(file: UploadFile = File(...)):
                         r_cell.font = band_font
                     else:
                         r_cell.font = rank_font
-                    r_cell.alignment = Alignment(horizontal="center", vertical="center")
+                    r_cell.alignment = CENTER_ALIGN
 
         # Fill PG rank in the correct output column
         if pg_col and pg_rank_out_col:
-            pg_name = ws_in.cell(row=row_idx, column=pg_col).value
+            pg_name = row_values[pg_col - 1] if pg_col - 1 < len(row_values) else None
             if pg_name and str(pg_name).strip():
-                matched = match_college(str(pg_name), colleges)
+                matched = match_cached(str(pg_name))
                 rank_val = rank_display(matched)
                 if rank_val:
                     r_cell = ws1.cell(row=row_idx, column=pg_rank_out_col)
@@ -297,12 +377,11 @@ async def process_excel(file: UploadFile = File(...)):
                         r_cell.font = band_font
                     else:
                         r_cell.font = rank_font
-                    r_cell.alignment = Alignment(horizontal="center", vertical="center")
+                    r_cell.alignment = CENTER_ALIGN
 
-    # Auto-width for first few key columns
-    for col in ws1.columns:
-        max_len = max((len(str(c.value)) if c.value else 0) for c in col)
-        ws1.column_dimensions[col[0].column_letter].width = min(max_len + 3, 40)
+    # Set column widths based on header length only (avoid O(rows*cols) auto-width scan)
+    for c_idx, h in enumerate(new_headers, 1):
+        ws1.column_dimensions[ws1.cell(row=1, column=c_idx).column_letter].width = min((len(str(h)) if h else 8) + 4, 40)
 
     ws1.freeze_panes = "A2"
 
@@ -314,37 +393,37 @@ async def process_excel(file: UploadFile = File(...)):
     ws2.column_dimensions["B"].width = 14
 
     # Header row — matches screenshot exactly: white bg, bold text, centered
+    ws2_hdr_font  = Font(name="Calibri", bold=True, size=11, color="111827")
+    ws2_data_font = Font(name="Calibri", size=11, color="111827")
+    ws2_hdr_fill  = PatternFill("solid", fgColor="FFFFFF")
+    green_fill    = PatternFill("solid", fgColor="E8F5E9")   # light green
+
     hdr_cells = [("UG University/institute Name", 1), ("Rank", 2)]
     for label, c in hdr_cells:
         cell = ws2.cell(row=1, column=c, value=label)
-        cell.font = Font(name="Calibri", bold=True, size=11, color="111827")
-        cell.fill = PatternFill("solid", fgColor="FFFFFF")
-        cell.border = excel_thin_border()
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.font = ws2_hdr_font
+        cell.fill = ws2_hdr_fill
+        cell.border = SHARED_BORDER
+        cell.alignment = HDR_ALIGN
     ws2.row_dimensions[1].height = 36
 
     # Data rows — exact input names in order, alternating light green fill
-    green_fill  = PatternFill("solid", fgColor="E8F5E9")   # light green
-    white_fill  = PatternFill("solid", fgColor="FFFFFF")
-
     for i, (orig_name, rank_str) in enumerate(ug_tab2_rows):
         row_num = i + 2
-        row_fill = green_fill  # all rows get the light green (matches screenshot)
 
         # Name cell
         cell_name = ws2.cell(row=row_num, column=1, value=orig_name)
-        cell_name.font = Font(name="Calibri", size=11, color="111827")
-        cell_name.fill = row_fill
-        cell_name.border = excel_thin_border()
-        cell_name.alignment = Alignment(horizontal="center", vertical="center")
+        cell_name.font = ws2_data_font
+        cell_name.fill = green_fill
+        cell_name.border = SHARED_BORDER
+        cell_name.alignment = CENTER_ALIGN
 
         # Rank cell
-        rank_val_display = rank_str if rank_str else ""
-        cell_rank = ws2.cell(row=row_num, column=2, value=rank_val_display)
-        cell_rank.font = Font(name="Calibri", size=11, color="111827")
-        cell_rank.fill = row_fill
-        cell_rank.border = excel_thin_border()
-        cell_rank.alignment = Alignment(horizontal="center", vertical="center")
+        cell_rank = ws2.cell(row=row_num, column=2, value=(rank_str if rank_str else ""))
+        cell_rank.font = ws2_data_font
+        cell_rank.fill = green_fill
+        cell_rank.border = SHARED_BORDER
+        cell_rank.alignment = CENTER_ALIGN
 
         ws2.row_dimensions[row_num].height = 28
 
